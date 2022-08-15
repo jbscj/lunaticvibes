@@ -75,7 +75,6 @@ private:
     void inputGameReleasePanel(InputMask&, const Time&);
 
 private:
-    void loadSongList();
     void _navigateUpBy1(const Time& t);
     void _navigateDownBy1(const Time& t);
     void _navigateEnter(const Time& t);
@@ -84,6 +83,13 @@ private:
     void _navigateSongEnter(const Time& t);
     void _navigateSongBack(const Time& t);
     bool _closeAllPanels(const Time& t);
+
+protected:
+    virtual bool checkAndStartTextEdit() override;
+    void inputGamePressTextEdit(InputMask&, const Time&);
+    virtual void stopTextEdit(bool modify) override;
+    void resetJukeboxText();
+    void searchSong(const std::string& text);
 
 private:
     void _imguiInit();
