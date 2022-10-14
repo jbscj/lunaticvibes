@@ -14,27 +14,27 @@ bool checkPanel(int panelIdx)
     case -1:
     {
         bool panel =
-            gSwitches.get(eSwitch::SELECT_PANEL1) ||
-            gSwitches.get(eSwitch::SELECT_PANEL2) ||
-            gSwitches.get(eSwitch::SELECT_PANEL3) ||
-            gSwitches.get(eSwitch::SELECT_PANEL4) ||
-            gSwitches.get(eSwitch::SELECT_PANEL5) ||
-            gSwitches.get(eSwitch::SELECT_PANEL6) ||
-            gSwitches.get(eSwitch::SELECT_PANEL7) ||
-            gSwitches.get(eSwitch::SELECT_PANEL8) ||
-            gSwitches.get(eSwitch::SELECT_PANEL9);
+            State::get(IndexSwitch::SELECT_PANEL1) ||
+            State::get(IndexSwitch::SELECT_PANEL2) ||
+            State::get(IndexSwitch::SELECT_PANEL3) ||
+            State::get(IndexSwitch::SELECT_PANEL4) ||
+            State::get(IndexSwitch::SELECT_PANEL5) ||
+            State::get(IndexSwitch::SELECT_PANEL6) ||
+            State::get(IndexSwitch::SELECT_PANEL7) ||
+            State::get(IndexSwitch::SELECT_PANEL8) ||
+            State::get(IndexSwitch::SELECT_PANEL9);
         return !panel;
     }
     case 0: return true;
-    case 1: return gSwitches.get(eSwitch::SELECT_PANEL1);
-    case 2: return gSwitches.get(eSwitch::SELECT_PANEL2);
-    case 3: return gSwitches.get(eSwitch::SELECT_PANEL3);
-    case 4: return gSwitches.get(eSwitch::SELECT_PANEL4);
-    case 5: return gSwitches.get(eSwitch::SELECT_PANEL5);
-    case 6: return gSwitches.get(eSwitch::SELECT_PANEL6);
-    case 7: return gSwitches.get(eSwitch::SELECT_PANEL7);
-    case 8: return gSwitches.get(eSwitch::SELECT_PANEL8);
-    case 9: return gSwitches.get(eSwitch::SELECT_PANEL9);
+    case 1: return State::get(IndexSwitch::SELECT_PANEL1);
+    case 2: return State::get(IndexSwitch::SELECT_PANEL2);
+    case 3: return State::get(IndexSwitch::SELECT_PANEL3);
+    case 4: return State::get(IndexSwitch::SELECT_PANEL4);
+    case 5: return State::get(IndexSwitch::SELECT_PANEL5);
+    case 6: return State::get(IndexSwitch::SELECT_PANEL6);
+    case 7: return State::get(IndexSwitch::SELECT_PANEL7);
+    case 8: return State::get(IndexSwitch::SELECT_PANEL8);
+    case 9: return State::get(IndexSwitch::SELECT_PANEL9);
     default: return false;
     }
 }
@@ -59,15 +59,15 @@ bool vSprite::updateByKeyframes(const Time& rawTime)
 	Time time;
 
 	// Check if timer is 140
-	if (_triggerTimer == eTimer::MUSIC_BEAT)
-		time = gTimers.get(eTimer::MUSIC_BEAT);
+	if (_triggerTimer == IndexTimer::MUSIC_BEAT)
+		time = State::get(IndexTimer::MUSIC_BEAT);
     else
     {
         // Check if timer is valid
-        if (gTimers.get(_triggerTimer) < 0)
+        if (State::get(_triggerTimer) < 0)
             return false;
 
-        time = rawTime - Time(gTimers.get(_triggerTimer), false);
+        time = rawTime - Time(State::get(_triggerTimer), false);
     }
 
     // Check if the sprite is not visible yet
@@ -127,33 +127,33 @@ bool vSprite::updateByKeyframes(const Time& rawTime)
         else
         {
             // normalize time
-            double t = 1.0 * (time.norm() - keyFrameCurr->time) / keyFrameLength;
+            double prog = 1.0 * (time.norm() - keyFrameCurr->time) / keyFrameLength;
             switch (keyFrameCurr->param.accel)
             {
             case RenderParams::CONSTANT:
                 break;
             case RenderParams::ACCEL:
-                t = std::pow(t, 2.0);
+                prog = -std::cos(prog * 1.57079632679) + 1.0;
                 break;
             case RenderParams::DECEL:
-                t = std::pow(t, 0.5);
+                prog = std::sin(prog * 1.57079632679);
                 break;
             case RenderParams::DISCONTINOUS:
-                t = 0.0;
+                prog = 0.0;
             }
 
             // calculate parameters
-            _current.rect.x = (int)grad(keyFrameNext->param.rect.x, keyFrameCurr->param.rect.x, t);
-            _current.rect.y = (int)grad(keyFrameNext->param.rect.y, keyFrameCurr->param.rect.y, t);
-            _current.rect.w = (int)grad(keyFrameNext->param.rect.w, keyFrameCurr->param.rect.w, t);
-            _current.rect.h = (int)grad(keyFrameNext->param.rect.h, keyFrameCurr->param.rect.h, t);
-            //_current.rect  = keyFrameNext->param.rect  * t + keyFrameCurr->param.rect  * (1.0 - t);
-            _current.color.r = (Uint8)grad(keyFrameNext->param.color.r, keyFrameCurr->param.color.r, t);
-            _current.color.g = (Uint8)grad(keyFrameNext->param.color.g, keyFrameCurr->param.color.g, t);
-            _current.color.b = (Uint8)grad(keyFrameNext->param.color.b, keyFrameCurr->param.color.b, t);
-            _current.color.a = (Uint8)grad(keyFrameNext->param.color.a, keyFrameCurr->param.color.a, t);
-            //_current.color = keyFrameNext->param.color * t + keyFrameNext->param.color * (1.0 - t);
-            _current.angle = grad(static_cast<int>(std::round(keyFrameNext->param.angle)), static_cast<int>(std::round(keyFrameCurr->param.angle)), t);
+            _current.rect.x = (int)grad(keyFrameNext->param.rect.x, keyFrameCurr->param.rect.x, prog);
+            _current.rect.y = (int)grad(keyFrameNext->param.rect.y, keyFrameCurr->param.rect.y, prog);
+            _current.rect.w = (int)grad(keyFrameNext->param.rect.w, keyFrameCurr->param.rect.w, prog);
+            _current.rect.h = (int)grad(keyFrameNext->param.rect.h, keyFrameCurr->param.rect.h, prog);
+            //_current.rect  = keyFrameNext->param.rect  * prog + keyFrameCurr->param.rect  * (1.0 - prog);
+            _current.color.r = (Uint8)grad(keyFrameNext->param.color.r, keyFrameCurr->param.color.r, prog);
+            _current.color.g = (Uint8)grad(keyFrameNext->param.color.g, keyFrameCurr->param.color.g, prog);
+            _current.color.b = (Uint8)grad(keyFrameNext->param.color.b, keyFrameCurr->param.color.b, prog);
+            _current.color.a = (Uint8)grad(keyFrameNext->param.color.a, keyFrameCurr->param.color.a, prog);
+            //_current.color = keyFrameNext->param.color * prog + keyFrameNext->param.color * (1.0 - prog);
+            _current.angle = grad(static_cast<int>(std::round(keyFrameNext->param.angle)), static_cast<int>(std::round(keyFrameCurr->param.angle)), prog);
             _current.center = keyFrameCurr->param.center;
             //LOG_DEBUG << "[Skin] Time: " << time << 
             //    " @ " << _current.rect.x << "," << _current.rect.y << " " << _current.rect.w << "x" << _current.rect.h;
@@ -213,7 +213,7 @@ void vSprite::setLoopTime(int t)
     _loopTo = t;
 }
 
-void vSprite::setTrigTimer(eTimer t)
+void vSprite::setTrigTimer(IndexTimer t)
 {
 	_triggerTimer = t;
 }
@@ -222,6 +222,23 @@ void vSprite::appendKeyFrame(const RenderKeyFrame& f)
 {
     _keyFrames.push_back(f);
 }
+
+void vSprite::moveAfterUpdate(int x, int y)
+{
+    _current.rect.x += x;
+    _current.rect.y += y;
+
+    auto updateChildLambda = [&](std::weak_ptr<vSprite> p) { if (!p.expired()) p.lock()->moveAfterUpdate(x, y); };
+
+    // children under the same level can be shuffled
+#ifdef _DEBUG
+    std::for_each(std::execution::par_unseq, _children.begin(), _children.end(), updateChildLambda);
+#else
+    std::for_each(std::execution::par_unseq, _children.begin(), _children.end(), updateChildLambda);
+#endif
+
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Static
@@ -311,7 +328,7 @@ bool SpriteSelection::update(const Time& t)
 // Animated
 
 SpriteAnimated::SpriteAnimated(pTexture texture, 
-    unsigned animFrames, unsigned frameTime, eTimer t, 
+    unsigned animFrames, unsigned frameTime, IndexTimer t, 
     unsigned selRows, unsigned selCols, bool selVert):
     SpriteAnimated(texture, texture ? texture->getRect() : Rect(), animFrames, frameTime, t,
 		selRows, selCols, selVert)
@@ -319,7 +336,7 @@ SpriteAnimated::SpriteAnimated(pTexture texture,
 }
 
 SpriteAnimated::SpriteAnimated(pTexture texture, const Rect& r, 
-    unsigned animFrames, unsigned frameTime, eTimer t, 
+    unsigned animFrames, unsigned frameTime, IndexTimer t, 
     unsigned selRows, unsigned selCols, bool selVert):
     SpriteSelection(texture, r, selRows, selCols, selVert), _animFrames(animFrames), _resetAnimTimer(t)
 {
@@ -352,7 +369,7 @@ bool SpriteAnimated::update(const Time& t)
 
 void SpriteAnimated::updateByTimer(const Time& time)
 {
-	if (gTimers.get(_triggerTimer))
+	if (State::get(_triggerTimer))
 		updateByKeyframes(time);
 }
 
@@ -387,8 +404,8 @@ void SpriteAnimated::updateAnimation(const Time& time)
 
 void SpriteAnimated::updateAnimationByTimer(const Time& time)
 {
-	if (gTimers.get(_resetAnimTimer))
-		updateAnimation(time - Time(gTimers.get(_resetAnimTimer)));
+	if (State::get(_resetAnimTimer))
+		updateAnimation(time - Time(State::get(_resetAnimTimer)));
 }
 
 // Commented for backup purpose. I don't think I can understand this...
@@ -401,8 +418,8 @@ void SpriteAnimated::updateSplitByTimer(rTime time)
     // time per frame: _period / _aframes
     // current time:   t
     // current frame:  t / (_period / _aframes)
-    if (_period / _aframes > 0 && gTimers.get(_triggerTimer))
-        updateSplit((frameIdx)((time - gTimers.get(_triggerTimer)) / (_period / _aframes)));
+    if (_period / _aframes > 0 && State::get(_triggerTimer))
+        updateSplit((frameIdx)((time - State::get(_triggerTimer)) / (_period / _aframes)));
 }
 */
 void SpriteAnimated::draw() const
@@ -416,14 +433,14 @@ void SpriteAnimated::draw() const
 ////////////////////////////////////////////////////////////////////////////////
 // Text
 
-SpriteText::SpriteText(pFont f, eText e, TextAlign a, unsigned ptsize, Color c):
-   SpriteStatic(nullptr), _pFont(f), _textInd(e), _align(a), _color(c)
+SpriteText::SpriteText(pFont f, IndexText e, TextAlign a, unsigned ptsize, Color c):
+   SpriteStatic(nullptr), _pFont(f), _textInd(e), _align(a), _height(ptsize * 3 / 2), _color(c)
 {
     _type = SpriteTypes::TEXT;
 }
 
 /*
-SpriteText::SpriteText(pFont f, Rect rect, eText e, TextAlign a, unsigned ptsize, Color c):
+SpriteText::SpriteText(pFont f, Rect rect, IndexText e, TextAlign a, unsigned ptsize, Color c):
    SpriteStatic(nullptr), _pFont(f), _frameRect(rect), _textInd(e), _align(a), _color(c)
 {
     _opType = SpriteTypes::TEXT;
@@ -441,7 +458,7 @@ void SpriteText::updateText()
 {
     if (!_draw) return;
 
-    setInputBindingText(gTexts.get(_textInd), _current.color);
+    setInputBindingText(State::get(_textInd), _current.color);
     updateTextRect();
 
 }
@@ -506,6 +523,7 @@ void SpriteText::setInputBindingText(std::string&& text, const Color& c)
     if (_pTexture)
     {
         _texRect = _pTexture->getRect();
+        _texRect.h = _height;
         _draw = true;
     }
     else
@@ -531,7 +549,7 @@ void SpriteText::startEditing(bool clear)
     if (!_editing)
     {
         _editing = true;
-        _textBeforeEdit = gTexts.get(_textInd);
+        _textBeforeEdit = State::get(_textInd);
         _textAfterEdit = (clear ? "" : _currText);
         startTextInput(_current.rect, _textAfterEdit, std::bind(&SpriteText::EditUpdateText, this, _1));
     }
@@ -543,7 +561,7 @@ void SpriteText::stopEditing(bool modify)
     {
         stopTextInput();
         _editing = false;
-        gTexts.set(_textInd, (modify ? _textAfterEdit : _textBeforeEdit));
+        State::set(_textInd, (modify ? _textAfterEdit : _textBeforeEdit));
         updateText();
     }
 }
@@ -551,7 +569,7 @@ void SpriteText::stopEditing(bool modify)
 void SpriteText::EditUpdateText(const std::string& text)
 {
     _textAfterEdit = text;
-    gTexts.set(_textInd, text + "|");
+    State::set(_textInd, text + "|");
     updateText();
 }
 
@@ -565,7 +583,7 @@ void SpriteText::draw() const
 
 
 SpriteNumber::SpriteNumber(pTexture texture, NumberAlign align, unsigned maxDigits,
-    unsigned numRows, unsigned numCols, unsigned frameTime, eNumber n, eTimer t,
+    unsigned numRows, unsigned numCols, unsigned frameTime, IndexNumber n, IndexTimer t,
     unsigned animFrames, bool numVert):
     SpriteNumber(texture, texture ? texture->getRect() : Rect(), align, maxDigits,
 		numRows, numCols, frameTime, n, t,
@@ -574,7 +592,7 @@ SpriteNumber::SpriteNumber(pTexture texture, NumberAlign align, unsigned maxDigi
 }
 
 SpriteNumber::SpriteNumber(pTexture texture, const Rect& rect, NumberAlign align, unsigned maxDigits,
-    unsigned numRows, unsigned numCols, unsigned frameTime, eNumber n, eTimer t,
+    unsigned numRows, unsigned numCols, unsigned frameTime, IndexNumber n, IndexTimer t,
     unsigned animFrames, bool numVert):
     SpriteAnimated(texture, rect, animFrames, frameTime, t, numRows, numCols, numVert),
     _alignType(align), _numInd(n), _maxDigits(maxDigits)
@@ -698,20 +716,20 @@ void SpriteNumber::updateNumberByInd()
     int n;
     switch (_numInd)
     {
-    case eNumber::RANDOM:
+    case IndexNumber::RANDOM:
         n = std::rand();
         break;
-    case eNumber::ZERO:
+    case IndexNumber::ZERO:
         n = 0;
         break;
-	case (eNumber)10220:
+	case (IndexNumber)10220:
 		n = int(Time().norm() & 0xFFFFFFFF);
 		break;
     default:
 #ifdef _DEBUG
-		n = (int)_numInd >= 10000 ? (int)gTimers.get((eTimer)((int)_numInd - 10000)) : gNumbers.get(_numInd);
+		n = (int)_numInd >= 10000 ? (int)State::get((IndexTimer)((int)_numInd - 10000)) : State::get(_numInd);
 #else
-        n = gNumbers.get(_numInd);
+        n = State::get(_numInd);
 #endif
         break;
     }
@@ -795,15 +813,25 @@ void SpriteNumber::draw() const
     }
 }
 
+void SpriteNumber::moveAfterUpdate(int x, int y)
+{
+    vSprite::moveAfterUpdate(x, y);
+    for (auto& d : _rects)
+    {
+        d.x += x;
+        d.y += y;
+    }
+}
+
 SpriteSlider::SpriteSlider(pTexture texture, SliderDirection d, int range, std::function<void(double)> cb,
-	unsigned animFrames, unsigned frameTime, eSlider ind, eTimer timer,
+	unsigned animFrames, unsigned frameTime, IndexSlider ind, IndexTimer timer,
 	unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
 	SpriteSlider(texture, texture ? texture->getRect() : Rect(), d, range, cb,
 		animFrames, frameTime, ind, timer,
 		selRows, selCols, selVerticalIndexing) {}
 
 SpriteSlider::SpriteSlider(pTexture texture, const Rect& rect, SliderDirection d, int range, std::function<void(double)> cb,
-	unsigned animFrames, unsigned frameTime, eSlider ind, eTimer timer,
+	unsigned animFrames, unsigned frameTime, IndexSlider ind, IndexTimer timer,
 	unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
 	SpriteAnimated(texture, rect, animFrames, frameTime, timer,
 		selRows, selCols, selVerticalIndexing), _callback(cb), _ind(ind), _dir(d), _range(range)
@@ -818,7 +846,7 @@ void SpriteSlider::updateVal(double v)
 
 void SpriteSlider::updateValByInd()
 {
-	updateVal(gSliders.get(_ind));
+	updateVal(State::get(_ind));
 }
 
 void SpriteSlider::updatePos()
@@ -934,14 +962,14 @@ bool SpriteSlider::OnDrag(int x, int y)
 }
 
 SpriteBargraph::SpriteBargraph(pTexture texture, BargraphDirection d,
-	unsigned animFrames, unsigned frameTime, eBargraph ind, eTimer timer,
+	unsigned animFrames, unsigned frameTime, IndexBargraph ind, IndexTimer timer,
 	unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
 	SpriteBargraph(texture, texture ? texture->getRect() : Rect(), d,
 		animFrames, frameTime, ind, timer,
 		selRows, selCols, selVerticalIndexing) {}
 
 SpriteBargraph::SpriteBargraph(pTexture texture, const Rect& rect, BargraphDirection d,
-	unsigned animFrames, unsigned frameTime, eBargraph ind, eTimer timer,
+	unsigned animFrames, unsigned frameTime, IndexBargraph ind, IndexTimer timer,
 	unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
 	SpriteAnimated(texture, rect, animFrames, frameTime, timer,
 		selRows, selCols, selVerticalIndexing), _dir(d), _ind(ind)
@@ -949,14 +977,14 @@ SpriteBargraph::SpriteBargraph(pTexture texture, const Rect& rect, BargraphDirec
 	_type = SpriteTypes::BARGRAPH;
 }
 
-void SpriteBargraph::updateVal(dpercent v)
+void SpriteBargraph::updateVal(Ratio v)
 {
 	_value = v;
 }
 
 void SpriteBargraph::updateValByInd()
 {
-	updateVal(gBargraphs.get(_ind));
+	updateVal(State::get(_ind));
 }
 
 #pragma warning(push)
@@ -998,14 +1026,14 @@ bool SpriteBargraph::update(const Time& t)
 }
 
 SpriteOption::SpriteOption(pTexture texture,
-	unsigned animFrames, unsigned frameTime, eTimer timer,
+	unsigned animFrames, unsigned frameTime, IndexTimer timer,
 	unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
 	SpriteOption(texture, texture ? texture->getRect() : Rect(),
 		animFrames, frameTime, timer,
 		selRows, selCols, selVerticalIndexing) {}
 
 SpriteOption::SpriteOption(pTexture texture, const Rect& rect,
-	unsigned animFrames, unsigned frameTime, eTimer timer,
+	unsigned animFrames, unsigned frameTime, IndexTimer timer,
 	unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
 	SpriteAnimated(texture, rect, animFrames, frameTime, timer,
 		selRows, selCols, selVerticalIndexing)
@@ -1023,12 +1051,12 @@ bool SpriteOption::setInd(opType type, unsigned ind)
 
 	case opType::OPTION:
 		_opType = opType::OPTION;
-		_ind.op = (eOption)ind;
+		_ind.op = (IndexOption)ind;
 		return true;
 
 	case opType::SWITCH:
 		_opType = opType::SWITCH;
-		_ind.sw = (eSwitch)ind;
+		_ind.sw = (IndexSwitch)ind;
 		return true;
 	}
 	return false;
@@ -1048,11 +1076,11 @@ void SpriteOption::updateValByInd()
 		break;
 
 	case opType::OPTION:
-		updateVal(gOptions.get(_ind.op));
+		updateVal(State::get(_ind.op));
 		break;
 
 	case opType::SWITCH:
-		updateVal(gSwitches.get(_ind.sw));
+		updateVal(State::get(_ind.sw));
 		break;
 	}
 }
@@ -1068,14 +1096,14 @@ bool SpriteOption::update(const Time& t)
 }
 
 SpriteButton::SpriteButton(pTexture texture,
-    unsigned animFrames, unsigned frameTime, std::function<void(int)> cb, int panel, int plusonlyValue, eTimer timer,
+    unsigned animFrames, unsigned frameTime, std::function<void(int)> cb, int panel, int plusonlyValue, IndexTimer timer,
     unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
     SpriteButton(texture, texture ? texture->getRect() : Rect(),
         animFrames, frameTime, cb, panel, plusonlyValue, timer,
         selRows, selCols, selVerticalIndexing) {}
 
 SpriteButton::SpriteButton(pTexture texture, const Rect& rect,
-    unsigned animFrames, unsigned frameTime, std::function<void(int)> cb, int panel, int plusonlyValue, eTimer timer,
+    unsigned animFrames, unsigned frameTime, std::function<void(int)> cb, int panel, int plusonlyValue, IndexTimer timer,
     unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
     SpriteOption(texture, rect, animFrames, frameTime, timer,
         selRows, selCols, selVerticalIndexing), _callback(cb), _panel(panel), _plusonly_value(plusonlyValue)
@@ -1127,16 +1155,17 @@ bool SpriteButton::OnClick(int x, int y)
 
 SpriteGaugeGrid::SpriteGaugeGrid(pTexture texture,
 	unsigned animFrames, unsigned frameTime, int dx, int dy, unsigned min, unsigned max, unsigned grids,
-	eTimer timer, eNumber num, unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
+	IndexTimer timer, IndexNumber num, unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
 	SpriteGaugeGrid(texture, texture ? texture->getRect() : Rect(), animFrames, frameTime, 
         dx, dy, grids, min, max, timer, num, selRows, selCols, selVerticalIndexing) {}
 
 SpriteGaugeGrid::SpriteGaugeGrid(pTexture texture, const Rect& rect,
 	unsigned animFrames, unsigned frameTime,  int dx, int dy, unsigned min, unsigned max, unsigned grids,
-	eTimer timer, eNumber num, unsigned selRows, unsigned selCols, bool selVerticalIndexing): 
+	IndexTimer timer, IndexNumber num, unsigned selRows, unsigned selCols, bool selVerticalIndexing): 
 	SpriteAnimated(texture, rect, animFrames, frameTime, timer, selRows, selCols, selVerticalIndexing),
 	_diff_x(dx), _diff_y(dy), _grids(grids), _min(min), _max(max), _numInd(num)
 {
+    _type = SpriteTypes::GAUGE;
     _lighting.resize(_grids, false);
     setGaugeType(GaugeType::GROOVE);
 }
@@ -1194,7 +1223,7 @@ void SpriteGaugeGrid::updateVal(unsigned v)
 
 void SpriteGaugeGrid::updateValByInd()
 {
-	updateVal(gNumbers.get(_numInd));
+	updateVal(State::get(_numInd));
 }
 
 bool SpriteGaugeGrid::update(const Time& t)
@@ -1253,14 +1282,14 @@ void SpriteGaugeGrid::draw() const
 }
 
 SpriteOnMouse::SpriteOnMouse(pTexture texture,
-    unsigned animFrames, unsigned frameTime, int panel, const Rect& mouseArea, eTimer timer,
+    unsigned animFrames, unsigned frameTime, int panel, const Rect& mouseArea, IndexTimer timer,
     unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
     SpriteOnMouse(texture, texture ? texture->getRect() : Rect(), 
         animFrames, frameTime, panel, mouseArea, timer,
         selRows, selCols, selVerticalIndexing) {}
 
 SpriteOnMouse::SpriteOnMouse(pTexture texture, const Rect& rect, 
-    unsigned animFrames, unsigned frameTime, int panel, const Rect& mouseArea, eTimer timer,
+    unsigned animFrames, unsigned frameTime, int panel, const Rect& mouseArea, IndexTimer timer,
     unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
     SpriteAnimated(texture, rect, animFrames, frameTime, timer,
         selRows, selCols, selVerticalIndexing), panelIdx(panel), area(mouseArea)
@@ -1290,14 +1319,14 @@ void SpriteOnMouse::OnMouseMove(int x, int y)
 }
 
 SpriteCursor::SpriteCursor(pTexture texture, 
-    unsigned animFrames, unsigned frameTime, eTimer timer,
+    unsigned animFrames, unsigned frameTime, IndexTimer timer,
     unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
     SpriteCursor(texture, texture ? texture->getRect() : Rect(),
         animFrames, frameTime, timer,
         selRows, selCols, selVerticalIndexing) {}
 
 SpriteCursor::SpriteCursor(pTexture texture, const Rect& rect,
-    unsigned animFrames, unsigned frameTime, eTimer timer,
+    unsigned animFrames, unsigned frameTime, IndexTimer timer,
     unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
     SpriteAnimated(texture, rect, animFrames, frameTime, timer,
         selRows, selCols, selVerticalIndexing)

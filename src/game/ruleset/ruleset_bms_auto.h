@@ -7,8 +7,8 @@ class RulesetBMSAuto : public RulesetBMS
 {
 public:
     RulesetBMSAuto(
-        std::shared_ptr<vChartFormat> format,
-        std::shared_ptr<chart::vChart> chart,
+        std::shared_ptr<ChartFormatBase> format,
+        std::shared_ptr<ChartObjectBase> chart,
         eModGauge gauge,
         GameModeKeys keys,
         JudgeDifficulty difficulty = JudgeDifficulty::NORMAL,
@@ -19,7 +19,6 @@ protected:
 	double targetRate = 100.0;
     std::vector<JudgeType> noteJudges;
     size_t judgeIndex = 0;
-    bool showJudge = true;
 
     std::map<JudgeType, unsigned> totalJudgeCount;
 
@@ -27,9 +26,6 @@ protected:
 
 public:
     void setTargetRate(double rate);
-
-    virtual bool isFailed() const override { return gPlayContext.isAuto ? RulesetBMS::isFailed() : true; }
-    virtual bool isFinished() const override { return gPlayContext.isAuto ? RulesetBMS::isFinished() : true; }
 
     // Register to InputWrapper
     virtual void updatePress(InputMask& pg, const Time& t) override {}

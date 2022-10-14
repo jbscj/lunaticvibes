@@ -27,7 +27,7 @@ void SpriteLine::updateProgress(const Time& t)
     int duration = _end - _start;
     if (duration > 0)
     {
-        long long rt = t.norm() - gTimers.get(_triggerTimer);
+        long long rt = t.norm() - State::get(_triggerTimer);
         if (rt >= _start)
         {
             _progress = (double)(rt - _start) / duration;
@@ -150,11 +150,22 @@ void SpriteLine::updateRects()
         break;
     }
 
+    case LineType::SCORE_MYBEST:
+    {
+        if (gPlayContext.ruleset[PLAYER_SLOT_MYBEST])
+        {
+            auto p = gPlayContext.graphScore[PLAYER_SLOT_MYBEST];
+            size_t s = p.size();
+            pushRects(s, p, gPlayContext.ruleset[PLAYER_SLOT_MYBEST]->getMaxScore());
+        }
+        break;
+    }
+
     case LineType::SCORE_TARGET:
     {
-        auto pt = gPlayContext.graphScoreTarget;
+        auto pt = gPlayContext.graphScore[PLAYER_SLOT_TARGET];
         size_t s = pt.size();
-        pushRects(s, pt, gPlayContext.ruleset[PLAYER_SLOT_1P]->getMaxScore());
+        pushRects(s, pt, gPlayContext.ruleset[PLAYER_SLOT_PLAYER]->getMaxScore());
         break;
     }
 

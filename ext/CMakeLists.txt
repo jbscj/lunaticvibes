@@ -83,11 +83,25 @@ target_include_directories(imgui PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/imgui)
 
 
-# Add thread-pool
-add_library(BS_thread_pool INTERFACE)
-target_include_directories(BS_thread_pool INTERFACE 
-    ${CMAKE_CURRENT_LIST_DIR}/thread-pool)
-
 # Add google/re2
 option(RE2_BUILD_TESTING "enable testing for RE2" OFF)
 add_subdirectory(re2)
+
+# Add taocpp/json
+add_subdirectory(json)
+
+# Add html tidy
+option(BUILD_SHARED_LIB "Set OFF to NOT build shared library" OFF)
+option(SUPPORT_CONSOLE_APP "Set OFF to build libraries only without console application support." OFF)
+add_subdirectory(tidy-html5)
+
+# Add OpenSSL (from system)
+if (UNIX OR MINGW)
+    find_library(OpenSSL REQUIRED)
+endif()
+
+# Add cereal
+option(BUILD_DOC "Build documentation" OFF)
+option(BUILD_SANDBOX "Build sandbox examples" OFF)
+option(SKIP_PERFORMANCE_COMPARISON "Skip building performance sandbox comparison (requires boost)" ON)
+add_subdirectory(cereal)

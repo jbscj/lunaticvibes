@@ -20,6 +20,12 @@ private:
 protected:
 	std::map<SoundChannelType, std::shared_ptr<FMOD::ChannelGroup>> channelGroup;
 	std::map<SampleChannel, float> volume;
+	float sysVolume = 1.0;
+
+	float sysVolumeGradientBegin = 1.0;
+	float sysVolumeGradientEnd = 1.0;
+	Time sysVolumeGradientBeginTime;
+	int sysVolumeGradientLength = 0;
 
 	std::map<SoundChannelType, FMOD::DSP*> DSPMaster[3];
 	std::map<SoundChannelType, FMOD::DSP*> DSPKey[3];
@@ -64,6 +70,7 @@ public:
 	virtual void playNoteSample(SoundChannelType ch, size_t count, size_t index[]);
 	virtual void stopNoteSamples();
 	virtual void freeNoteSamples();
+	virtual long long getNoteSampleLength(size_t index);
 	virtual void update();
 
 public:
@@ -74,6 +81,7 @@ public:
 	int getChannelsPlaying();
 
 public:
+	virtual void setSysVolume(float v, int gradientTime = 0);
 	virtual void setVolume(SampleChannel ch, float v);
 	virtual void setDSP(DSPType type, int index, SampleChannel ch, float p1, float p2);
 	virtual void setFreqFactor(double f);

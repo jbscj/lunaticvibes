@@ -16,16 +16,19 @@ enum eEntryType
     NEW_COURSE,
     COURSE,
     RANDOM_COURSE,
+
+    CHART_LINK,
+    REPLAY,
 };
 
-class vEntry
+class EntryBase
 {
 protected:
     eEntryType _type = eEntryType::UNKNOWN;
 
 public:
-    vEntry() = default;
-    virtual ~vEntry() = default;
+    EntryBase() = default;
+    virtual ~EntryBase() = default;
 
 public:
     HashMD5 md5;

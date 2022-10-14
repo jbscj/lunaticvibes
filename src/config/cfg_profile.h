@@ -21,7 +21,25 @@ namespace cfg
     constexpr char P_GREENNUMBER[] = "GreenNumber";
     constexpr char P_LOCK_SPEED[] = "LockSpeed";
 
-	constexpr char P_LOAD_BGA[] = "LoadBga";
+    constexpr char P_BGA_TYPE[] = "BGAType";
+    constexpr char P_BGA_TYPE_OFF[] = "Off";
+    constexpr char P_BGA_TYPE_ON[] = "On";
+    constexpr char P_BGA_TYPE_AUTOPLAY[] = "Autoplay";
+    enum class eBgaType
+    {
+        OFF,
+        ON,
+        AUTOPLAY,
+    };
+
+    constexpr char P_BGA_SIZE[] = "BGASize";
+    constexpr char P_BGA_SIZE_NORMAL[] = "Normal";
+    constexpr char P_BGA_SIZE_EXTEND[] = "Extend";
+    enum class eBgaSize
+    {
+        NORMAL,
+        EXTEND,
+    };
 
     constexpr char P_SPEED_TYPE[] = "SpeedType";
     constexpr char P_SPEED_TYPE_NORMAL[] = "Normal";
@@ -40,7 +58,28 @@ namespace cfg
         CONSTANT
     };
 
-    constexpr char P_LIFT[] = "Lift";
+    constexpr char P_TARGET_TYPE[] = "TargetType";
+    constexpr char P_TARGET_TYPE_0[] = "NotSet";
+    constexpr char P_TARGET_TYPE_MYBEST[] = "MyBest";
+    constexpr char P_TARGET_TYPE_AAA[] = "RankAAA";
+    constexpr char P_TARGET_TYPE_AA[] = "RankAA";
+    constexpr char P_TARGET_TYPE_A[] = "RankA";
+    constexpr char P_TARGET_TYPE_DEFAULT[] = "Default";
+    constexpr char P_TARGET_TYPE_IR_TOP[] = "IRTop";
+    constexpr char P_TARGET_TYPE_IR_NEXT[] = "IRNext";
+    constexpr char P_TARGET_TYPE_IR_AVERAGE[] = "IRAverage";
+    enum class eTargetType
+    {
+        NOTSET,
+        MYBEST,
+        RANK_AAA,
+        RANK_AA,
+        RANK_A,
+        DEFAULT,
+        IR_TOP,
+        IR_NEXT,
+        IR_AVERAGE,
+    };
 
     constexpr char P_CHART_OP[] = "ChartOption";
     constexpr char P_CHART_OP_NORMAL[] = "Normal";
@@ -66,6 +105,23 @@ namespace cfg
     {
         NORMAL,
         AUTOSCR,
+    };
+
+    constexpr char P_LANE_EFFECT_OP[] = "LaneEffect";
+    constexpr char P_LANE_EFFECT_OP_OFF[] = "Off";
+    constexpr char P_LANE_EFFECT_OP_HIDDEN[] = "Hidden+";
+    constexpr char P_LANE_EFFECT_OP_SUDDEN[] = "Sudden+";
+    constexpr char P_LANE_EFFECT_OP_SUDHID[] = "SUD+&HID+";
+    constexpr char P_LANE_EFFECT_OP_LIFT[] = "Lift";
+    constexpr char P_LANE_EFFECT_OP_LIFTSUD[] = "LIFT&SUD+";
+    enum class eLaneEffectOp
+    {
+        OFF,
+        HIDDEN,
+        SUDDEN,
+        SUDHID,
+        LIFT,
+        LIFTSUD,
     };
 
     constexpr char P_GAUGE_OP[] = "GaugeOption";
@@ -99,6 +155,7 @@ namespace cfg
     };
 
     constexpr char P_GHOST_TYPE[] = "GhostType";;
+    constexpr char P_GHOST_TYPE_OFF[] = "Off";
     constexpr char P_GHOST_TYPE_A[] = "A";
     constexpr char P_GHOST_TYPE_B[] = "B";
     constexpr char P_GHOST_TYPE_C[] = "C";
@@ -110,14 +167,7 @@ namespace cfg
         NEAR_JUDGE_DOWN,
     };
 
-    constexpr char P_GHOST_TARGET[] = "GhostTarget";         // Rate (since multi ruleset)
-
-    constexpr char P_TARGET[] = "Target";
-    constexpr char P_TARGET_MYBEST[] = "Best score";
-    constexpr char P_TARGET_RANK_A[] = "Rank A";
-    constexpr char P_TARGET_RANK_AA[] = "Rank AA";
-    constexpr char P_TARGET_RANK_AAA[] = "Rank AAA";
-
+    constexpr char P_GHOST_TARGET[] = "GhostTarget";         // Ghost Target Rate% (Target: Default)
 
     constexpr char P_GHOST_FS_TRIGGER[] = "GhostFSTrigger";  // except PERFECT, always
     constexpr char P_GHOST_FS_TRIGGER_SUB[] = "Normal";
@@ -166,7 +216,6 @@ namespace cfg
     constexpr char P_DIFFICULTY_FILTER_ANOTHER[] = "Another";
     constexpr char P_DIFFICULTY_FILTER_INSANE[] = "Insane";
 
-    constexpr char P_BATTLE[] = "Battle";
     constexpr char P_FLIP[] = "Flip";
     constexpr char P_SCORE_GRAPH[] = "ScoreGraph";
     constexpr char P_LANECOVER_ENABLE[] = "Lanecover";

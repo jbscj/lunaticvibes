@@ -23,6 +23,7 @@ protected:
     std::vector<StringContent> optionsKeyList;
 
     std::map<eMode, std::vector<Path>> skinList;
+    std::vector<Path> soundsetList;
 
     eMode selectedMode;
 
@@ -42,7 +43,6 @@ protected:
     void load(eMode mode);
     void save(eMode mode) const;
     void updateTexts() const;
-
 
 protected:
     void inputGamePress(InputMask&, const Time&);

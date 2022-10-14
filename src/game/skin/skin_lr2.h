@@ -14,7 +14,7 @@
 #include "game/graphics/sprite_imagetext.h"
 #include "game/graphics/sprite_graph.h"
 #include "game/input/input_mgr.h"
-#include "game/data/switch.h"
+#include "game/runtime/state.h"
 
 namespace LR2SkinDef
 {
@@ -40,7 +40,7 @@ namespace LR2SkinDef
 
         XOR = 6,
 
-        MULTIPLY_ANTI_BACKGROUND = 9,
+        MULTIPLY_INVERTED_BACKGROUND = 9,
         ANTI_COLOR = 10,
         MULTIPLY_WITH_ALPHA = 11
 
@@ -1337,6 +1337,9 @@ protected:
     static bool customizeDst[100];  // temporary workaround
 
 private:
+    static std::map<std::string, pTexture> LR2SkinImageCache;
+    static std::map<std::string, Path> LR2SkinFontPathCache;
+
     struct Customize
     {
         enum class _Type { OPT, FILE } type;
@@ -1355,6 +1358,7 @@ private:
         size_t defIdx;
     };
     std::vector<Customize> customize;
+    std::map<size_t, size_t> customizeRandom;
 
     struct LR2Font
     {
@@ -1368,24 +1372,29 @@ private:
     std::map<std::string, std::shared_ptr<LR2Font>> LR2FontNameMap;
 
     Path filePath;
+    int loadMode = 0;   // 0: FULL / 1: No Font / 2: Header Only
 
 protected:
     size_t imageCount = 0;
     timeMS timeStartInputTimeRank = 0;            // Result / Course Result Only
     timeMS timeStartInputTimeUpdate = 0;        // Result / Course Result Only
     timeMS timeFadeoutLength = 0;
-    bool flipSide = false;
-    bool flipResult = false;                    // Result / Course Result Only
-    bool reloadBanner = false;
+    bool reloadBanner = false;                  // unused
+    bool flipSide = false;                      // flip 1P/2P defs: note indices, timers (42-139, 143, 144)
+    static inline bool flipResult = false;      // Set in play skin; Only result skin loads this, using static is fine
     bool disableFlipResult = false;
-    unsigned scratchSide1P = 0;                    // Play Skins Only; 0: left, 1: right
-    unsigned scratchSide2P = 0;                    // Play Skins Only; 0: left, 1: right
+    unsigned scratchSide1P = 0;                 // not implemented
+    unsigned scratchSide2P = 0;                 // not implemented
 
 public:
     SkinLR2() = delete;
-    SkinLR2(Path p, bool headerOnly = false);
+    SkinLR2(Path p, int loadMode = 0);
     virtual ~SkinLR2();
-    void loadCSV(Path p, bool headerOnly = false);
+
+protected:
+    void loadCSV(Path p);
+    void postLoad();
+    void findAndExtractDXA(const Path& path);
 
 protected:
     static constexpr size_t BAR_ENTRY_SPRITE_COUNT = 32;
@@ -1399,8 +1408,14 @@ protected:
     std::array<Rect, BAR_ENTRY_SPRITE_COUNT> _barAnimOrigin;
 
 protected:
-    std::vector<std::shared_ptr<SpriteLaneVertical>> _laneSprites;
+    std::vector<std::pair<std::shared_ptr<SpriteLaneVertical>, std::shared_ptr<SpriteLaneVertical>>> _laneSprites;  // { normal, auto }
     std::map<std::string, pFont>  _fontNameMap;
+
+protected:
+    std::list<pSprite> spritesMoveWithLift1P;
+    std::list<pSprite> spritesMoveWithLift2P;
+    Rect judgeLineRect1P;
+    Rect judgeLineRect2P;
 
 protected:
     typedef std::shared_ptr<SpriteLine> psLine;
@@ -1522,6 +1537,8 @@ private:
         {"AUTO_LN_START",  DefType::AUTO_LN_START},
     };
 
+    Path getCustomizePath(StringContentView input);
+
     int IMAGE();
     int INCLUDE();
     int LR2FONT();
@@ -1582,15 +1599,22 @@ protected:
     int  bufJudge2PSlot;
     std::array<bool, 6> noshiftJudge1P{ false };
     std::array<bool, 6> noshiftJudge2P{ false };
+    std::array<int, 6> alignNowCombo1P{ 0 };
+    std::array<int, 6> alignNowCombo2P{ 0 };
 
-    void IF(const Tokens &t, std::istream&, eFileEncoding enc);
+    void IF(const Tokens& t, std::istream&, eFileEncoding enc, bool ifUnsatisfied = false, bool skipOnly = false);
 
     //std::vector<SkinLR2> _csvIncluded;
 
 
+private:
+    // generated sprite references
+    pSprite spriteLanecoverTop1P = nullptr;
+    pSprite spriteLanecoverTop2P = nullptr;
+
 ////////////////////////////////////////////////////////////////////////////////
 
-private:
+protected:
     struct element
     {
         std::shared_ptr<vSprite> ps;

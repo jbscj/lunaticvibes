@@ -9,8 +9,7 @@
 #include <execution>
 #include "skin_lr2_button_callbacks.h"
 #include "skin_lr2_slider_callbacks.h"  
-#include "game/data/option.h"
-#include "game/data/switch.h"
+#include "game/runtime/state.h"
 #include "game/graphics/video.h"
 #include "game/scene/scene_context.h"
 #include "skin_lr2_converters.h"
@@ -22,6 +21,7 @@
 
 #ifdef _WIN32
 // For GetWindowsDirectory
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #endif
 
@@ -98,6 +98,8 @@ size_t convertOpsToInt(const Tokens& tokens, int* pData, size_t offset, size_t s
     return i;
 }
 
+static bool flipSideFlag = false;
+
     struct s_basic
     {
         int _null = 0;
@@ -128,6 +130,35 @@ size_t convertOpsToInt(const Tokens& tokens, int* pData, size_t offset, size_t s
                 LOG_WARNING << "[Skin] " << csvLineNumber << ": div_y is 0";
                 div_y = 1;
             }
+
+            if (flipSideFlag)
+            {
+                switch (timer)
+                {
+                case 42:    timer = 43; break;
+                case 43:    timer = 42; break;
+                case 44:    timer = 45; break;
+                case 45:    timer = 44; break;
+                case 46:    timer = 47; break;
+                case 47:    timer = 46; break;
+                case 48:    timer = 49; break;
+                case 49:    timer = 48; break;
+                case 143:   timer = 144; break;
+                case 144:   timer = 143; break;
+                default:
+                    if (50 <= timer && timer <= 59 ||
+                        70 <= timer && timer <= 79 ||
+                        100 <= timer && timer <= 109 ||
+                        120 <= timer && timer <= 129)
+                        timer += 10;
+                    else if (60 <= timer && timer <= 69 ||
+                        80 <= timer && timer <= 89 ||
+                        110 <= timer && timer <= 119 ||
+                        130 <= timer && timer <= 139)
+                        timer -= 10;
+                    break;
+                }
+            }
         }
     };
 
@@ -150,6 +181,34 @@ size_t convertOpsToInt(const Tokens& tokens, int* pData, size_t offset, size_t s
         s_number(const Tokens& tokens, size_t csvLineNumber = 0) : s_basic(tokens, csvLineNumber)
         {
             convertLine(tokens, (int*)this, &num - &_null, 3);
+
+            if (flipSideFlag)
+            {
+                if      (100 <= num && num <= 119) num += 20;
+                else if (302 <= num && num <= 306) num += 40;
+                else if (320 <= num && num <= 329) num += 10;
+                else if (360 <= num && num <= 369) num += 10;
+                else if (120 <= num && num <= 139) num -= 20;
+                else if (342 <= num && num <= 346) num -= 40;
+                else if (330 <= num && num <= 339) num -= 10;
+                else if (370 <= num && num <= 379) num -= 10;
+                else
+                {
+                    switch (num)
+                    {
+                    case 10:  num = 11; break;
+                    case 11:  num = 10; break;
+                    case 14:  num = 15; break;
+                    case 15:  num = 14; break;
+                    case 201: num = 213; break;
+                    case 210: num = 211; break;
+                    case 211: num = 210; break;
+                    case 212: num = 371; break;
+                    case 213: num = 213; break;
+                    case 214: num = 372; break;
+                    }
+                }
+            }
         }
     };
 
@@ -162,6 +221,19 @@ size_t convertOpsToInt(const Tokens& tokens, int* pData, size_t offset, size_t s
         s_slider(const Tokens& tokens, size_t csvLineNumber = 0) : s_basic(tokens, csvLineNumber)
         {
             convertLine(tokens, (int*)this, &muki - &_null, 4);
+
+            if (flipSideFlag)
+            {
+                switch (type)
+                {
+                case 2: type = 3; break;
+                case 3: type = 2; break;
+                case 4: type = 5; break;
+                case 5: type = 4; break;
+                case 8: type = 9; break;
+                case 9: type = 8; break;
+                }
+            }
         }
     };
 
@@ -172,6 +244,14 @@ size_t convertOpsToInt(const Tokens& tokens, int* pData, size_t offset, size_t s
         s_bargraph(const Tokens& tokens, size_t csvLineNumber = 0) : s_basic(tokens, csvLineNumber)
         {
             convertLine(tokens, (int*)this, &type - &_null, 2);
+            
+            if (flipSideFlag)
+            {
+                if      (10 <= type && type <= 11) type += 4;
+                else if (20 <= type && type <= 29) type += 10;
+                else if (14 <= type && type <= 15) type -= 4;
+                else if (30 <= type && type <= 39) type -= 10;
+            }
         }
     };
 
@@ -212,6 +292,23 @@ size_t convertOpsToInt(const Tokens& tokens, int* pData, size_t offset, size_t s
         {
             int count = sizeof(s_text) / sizeof(int);
             convertLine(tokens, (int*)this, 0, count);
+
+            if (flipSideFlag)
+            {
+                switch (st)
+                {
+                case 1:  st = 2; break;
+                case 2:  st = 1; break;
+                case 63: st = 64; break;
+                case 64: st = 63; break;
+                case 65: st = 66; break;
+                case 66: st = 65; break;
+                case 67: st = 68; break;
+                case 68: st = 67; break;
+                case 84: st = 85; break;
+                case 85: st = 84; break;
+                }
+            }
         }
     };
 
@@ -240,6 +337,8 @@ size_t convertOpsToInt(const Tokens& tokens, int* pData, size_t offset, size_t s
             size_t offset = sizeof(s_basic) / sizeof(int);
             size_t count = (sizeof(*this) - sizeof(s_basic)) / sizeof(int);
             convertLine(tokens, (int*)this, offset, count);
+
+            // DO not flip index here; there are two separate definitions called SRC_NOWJUDGE_1P / SRC_NOWJUDGE_2P
         }
     };
 
@@ -253,6 +352,8 @@ size_t convertOpsToInt(const Tokens& tokens, int* pData, size_t offset, size_t s
             size_t offset = sizeof(s_basic) / sizeof(int);
             size_t count = (sizeof(*this) - sizeof(s_basic)) / sizeof(int);
             convertLine(tokens, (int*)this, offset, count);
+
+            // DO not flip index here; there are two separate definitions called SRC_NOWCOMBO_1P / SRC_NOWCOMBO_2P
         }
     };
 
@@ -265,6 +366,12 @@ size_t convertOpsToInt(const Tokens& tokens, int* pData, size_t offset, size_t s
             size_t offset = sizeof(s_basic) / sizeof(int);
             size_t count = (sizeof(*this) - sizeof(s_basic)) / sizeof(int);
             convertLine(tokens, (int*)this, offset, count);
+
+            switch (_null)
+            {
+            case 0: _null = lr2skin::flipSideFlag ? 1 : 0; break;
+            case 1: _null = lr2skin::flipSideFlag ? 0 : 1; break;
+            }
         }
     };
 
@@ -340,11 +447,59 @@ size_t convertOpsToInt(const Tokens& tokens, int* pData, size_t offset, size_t s
             int count = sizeof(dst) / sizeof(int);
             convertLine(tokens, (int*)this, 0, count);
             convertOpsToInt(tokens, (int*)this, &op[0] - &_null, sizeof(op) / sizeof(op[0]));
+
+            if (flipSideFlag)
+            {
+                switch (timer)
+                {
+                case 42:    timer = 43; break;
+                case 43:    timer = 42; break;
+                case 44:    timer = 45; break;
+                case 45:    timer = 44; break;
+                case 46:    timer = 47; break;
+                case 47:    timer = 46; break;
+                case 48:    timer = 49; break;
+                case 49:    timer = 48; break;
+                case 143:   timer = 144; break;
+                case 144:   timer = 143; break;
+                default:
+                    if (50 <= timer && timer <= 59 ||
+                        70 <= timer && timer <= 79 ||
+                        100 <= timer && timer <= 109 ||
+                        120 <= timer && timer <= 129)
+                        timer += 10;
+                    else if (60 <= timer && timer <= 69 ||
+                        80 <= timer && timer <= 89 ||
+                        110 <= timer && timer <= 119 ||
+                        130 <= timer && timer <= 139)
+                        timer -= 10;
+                    break;
+                }
+            }
         }
     };
 
+    BlendMode convertBlend(int blend)
+    {
+        static const std::map<int, BlendMode> blendMap =
+        {
+            {0, BlendMode::NONE},
+            {1, BlendMode::ALPHA},
+            {2, BlendMode::ADD},
+            {3, BlendMode::SUBTRACT},
+            {4, BlendMode::MOD},
+            {6, BlendMode::ADD},    // LR2: XOR but implemented as ADD
+            {9, BlendMode::MULTIPLY_INVERTED_BACKGROUND},
+            {10, BlendMode::INVERT},
+            {11, BlendMode::MULTIPLY_WITH_ALPHA},
+        };
+        return (blendMap.find(blend) != blendMap.end()) ? blendMap.at(blend) : BlendMode::ALPHA;
+    }
 }
 
+std::map<std::string, pTexture> SkinLR2::LR2SkinImageCache;
+
+std::map<std::string, Path> SkinLR2::LR2SkinFontPathCache;
 std::map<Path, std::shared_ptr<SkinLR2::LR2Font>> SkinLR2::LR2FontCache;
 
 int SkinLR2::setExtendedProperty(std::string&& key, void* value)
@@ -528,116 +683,90 @@ Point getCenterPoint(const int& wi, const int& hi, int numpadCenter)
 ////////////////////////////////////////////////////////////////////////////////
 // File parsing
 #pragma region File parsing
-int SkinLR2::IMAGE()
+
+Path SkinLR2::getCustomizePath(StringContentView input)
 {
-    if (strEqual(parseKeyBuf, "#IMAGE", true))
+    Path path = PathFromUTF8(convertLR2Path(ConfigMgr::get('E', cfg::E_LR2PATH, "."), input));
+    StringPath pathStr = path.native();
+    std::string pathU8Str = path.u8string();
+
+    if (pathStr.find("*"_p) != pathStr.npos)
     {
-        Path path = PathFromUTF8(convertLR2Path(ConfigMgr::get('E', cfg::E_LR2PATH, "."), parseParamBuf[0]));
-        StringPath pathStr = path.native();
-        std::string pathU8Str = path.u8string();
-        if (pathStr.find("*"_p) != pathStr.npos)
+        // Check if the wildcard path is specified by custom settings
+        std::srand(std::time(NULL));
+        for (size_t idx = 0; idx < customize.size(); ++idx)
         {
-            // Check if the wildcard path is specified by custom settings
-            for (auto& cf : customize)
+            const auto& cf = customize[idx];
+            if (cf.type == Customize::_Type::FILE && cf.filepath == pathU8Str.substr(0, cf.filepath.length()))
             {
-                if (cf.type == Customize::_Type::FILE && cf.filepath == pathU8Str.substr(0, cf.filepath.length()))
-                {
-                    const auto& paths = cf.pathList;
-                    if (paths.empty())
-                    {
-                        _textureNameMap[std::to_string(imageCount)] = std::make_shared<Texture>(Image(""));
-                        LOG_DEBUG << "[Skin] " << csvLineNumber << ": Added IMAGE[" << imageCount << "]: " << "(placeholder)";
-                    }
-                    else
-                    {
-                        if (cf.filepath.length() < pathU8Str.length())
-                        {
-                            // #IMAGE offered a more specific path. Rebuild customfile list
-                            auto selection = paths[cf.value];
-                            auto defaultSel = paths[cf.defIdx];
-                            cf.value = 0;
-                            cf.defIdx = 0;
+                int value = (cf.pathList[cf.value] == "RANDOM") ? customizeRandom[idx] : cf.value;
 
-                            auto ls = findFiles(path);
-                            for (size_t param = 0; param < ls.size(); ++param)
-                            {
-                                auto filename = ls[param].filename().stem();
-                                if (filename == selection)
-                                {
-                                    cf.value = param;
-                                }
-                                if (filename == defaultSel)
-                                {
-                                    cf.defIdx = param;
-                                }
-                            }
+                Path pathFile = cf.pathList[value];
+                if (cf.filepath.length() < pathU8Str.length())
+                    pathFile /= PathFromUTF8(pathU8Str.substr(cf.filepath.length() + 1));
 
-                            cf.filepath = pathU8Str;
-                            cf.label.clear();
-                            for (auto& p : ls)
-                            {
-                                cf.label.push_back(p.filename().stem().u8string());
-                            }
-                            cf.pathList = std::move(ls);
-                        }
-
-                        if (video_file_extensions.find(toLower(paths[cf.value].extension().u8string())) != video_file_extensions.end())
-                        {
-#ifndef VIDEO_DISABLED
-                            _vidNameMap[std::to_string(imageCount)] = std::make_shared<sVideo>(paths[cf.value], true);
-                            _textureNameMap[std::to_string(imageCount)] = _textureNameMap["White"];
-#else
-                            _textureNameMap[std::to_string(imageCount)] = _textureNameMap["Black"];
-#endif
-                        }
-                        else
-                        {
-                            Image img = Image(paths[cf.value].u8string().c_str());
-                            if (info.hasTransparentColor) img.setTransparentColorRGB(info.transparentColor);
-                            _textureNameMap[std::to_string(imageCount)] = std::make_shared<Texture>(img);
-                        }
-                        LOG_DEBUG << "[Skin] " << csvLineNumber << ": Added IMAGE[" << imageCount << "]: " << cf.filepath;
-                    }
-                    ++imageCount;
-                    return 2;
-                }
+                return pathFile;
             }
+        }
 
-            // Or, randomly choose a file
-            auto ls = findFiles(path);
-            if (ls.empty())
-            {
-                _textureNameMap[std::to_string(imageCount)] = std::make_shared<Texture>(Image(""));
-                //imagePath.push_back(defs::file::errorTextureImage);
-                LOG_DEBUG << "[Skin] " << csvLineNumber << ": Added random IMAGE[" << imageCount << "]: " << "(file not found)";
-            }
-            else
-            {
-                size_t ranidx = std::rand() % ls.size();
-                if (video_file_extensions.find(toLower(ls[ranidx].extension().u8string())) != video_file_extensions.end())
-                {
-#ifndef VIDEO_DISABLED
-                    _vidNameMap[std::to_string(imageCount)] = std::make_shared<sVideo>(ls[ranidx], true);
-                    _textureNameMap[std::to_string(imageCount)] = _textureNameMap["Error"];
-#else
-                    _textureNameMap[std::to_string(imageCount)] = _textureNameMap["Black"];
-#endif
-                }
-                else
-                    _textureNameMap[std::to_string(imageCount)] = std::make_shared<Texture>(Image(ls[ranidx].u8string().c_str()));
-                LOG_DEBUG << "[Skin] " << csvLineNumber << ": Added random IMAGE[" << imageCount << "]: " << ls[ranidx].u8string();
-            }
-            ++imageCount;
-            return 3;
-
-            // TODO #IMAGE CONTINUE (derive from previous skin)
+        // Or, randomly choose a file
+        auto ls = findFiles(path);
+        if (ls.empty())
+        {
+            return Path();
         }
         else
         {
-            // Normal path
-            _textureNameMap[std::to_string(imageCount)] = std::make_shared<Texture>(Image(path.u8string().c_str()));
-            LOG_DEBUG << "[Skin] " << csvLineNumber << ": Added IMAGE[" << imageCount << "]: " << path.u8string();
+            size_t ranidx = std::rand() % ls.size();
+            return ls[ranidx];
         }
+    }
+
+    // Normal path
+    return path;
+}
+
+
+int SkinLR2::IMAGE()
+{
+    if (!strEqual(parseKeyBuf, "#IMAGE", true)) return 0;
+
+    if (strEqual(parseParamBuf[0], "CONTINUE", true))
+    {
+        // already referenced inside constructor; create a blank texture if not exist
+        std::string textureMapKey = std::to_string(imageCount);
+        if (_textureNameMap.find(textureMapKey) == _textureNameMap.end())
+        {
+            _textureNameMap[textureMapKey] = std::make_shared<Texture>(nullptr, 0, 0);
+        }
+        ++imageCount;
+        return 1;
+    }
+    else
+    {
+        Path pathFile = getCustomizePath(parseParamBuf[0]);
+        std::string textureMapKey = std::to_string(imageCount);
+
+        if (video_file_extensions.find(toLower(pathFile.extension().u8string())) != video_file_extensions.end())
+        {
+#ifndef VIDEO_DISABLED
+            _vidNameMap[textureMapKey] = std::make_shared<sVideo>(pathFile, 1.0, true);
+            _textureNameMap[textureMapKey] = _textureNameMap["White"];
+#else
+            _textureNameMap[textureMapKey] = _textureNameMap["Black"];
+#endif
+        }
+        else
+        {
+            Image img = Image(pathFile.u8string().c_str());
+            if (info.hasTransparentColor)
+                img.setTransparentColorRGB(info.transparentColor);
+            _textureNameMap[textureMapKey] = std::make_shared<Texture>(img);
+        }
+
+        LR2SkinImageCache[textureMapKey] = _textureNameMap[textureMapKey];
+        LOG_DEBUG << "[Skin] " << csvLineNumber << ": Added IMAGE[" << imageCount << "]: " << pathFile;
+
         ++imageCount;
         return 1;
     }
@@ -646,47 +775,47 @@ int SkinLR2::IMAGE()
 
 int SkinLR2::LR2FONT()
 {
-    if (strEqual(parseKeyBuf, "#LR2FONT", true))
-    {
-        Path path = PathFromUTF8(convertLR2Path(ConfigMgr::get('E', cfg::E_LR2PATH, "."), parseParamBuf[0]));
-        path = std::filesystem::absolute(path);
-        size_t idx = LR2FontNameMap.size();
+    if (!strEqual(parseKeyBuf, "#LR2FONT", true)) return 0;
 
-        if (LR2FontCache.find(path) != LR2FontCache.end())
+    if (strEqual(parseParamBuf[0], "CONTINUE", true))
+    {
+        // already referenced inside constructor; create a blank texture if not exist
+        std::string fontNameKey = std::to_string(LR2FontNameMap.size());
+        if (LR2SkinFontPathCache.find(fontNameKey) != LR2SkinFontPathCache.end())
         {
-            LR2FontNameMap[std::to_string(idx)] = LR2FontCache[path];
+            Path path = LR2SkinFontPathCache[fontNameKey];
+            LR2FontNameMap[fontNameKey] = LR2FontCache[path];
+        }
+        else
+        {
+            LR2FontNameMap[fontNameKey] = nullptr;
+        }
+        return 1;
+    }
+    else
+    {
+        Path path = getCustomizePath(parseParamBuf[0]);
+        path = std::filesystem::absolute(path);
+        std::string fontNameKey = std::to_string(LR2FontNameMap.size());
+
+        if (loadMode >= 1)
+        {
+            LR2FontNameMap[fontNameKey] = nullptr;
             return 1;
         }
 
-        if (!fs::is_regular_file(path))
+        if (LR2FontCache.find(path) != LR2FontCache.end())
         {
-            std::string archiveName;
-            Path lr2skinFolder = fs::absolute(filePath).parent_path();
-            auto lr2skinFolderStr = lr2skinFolder.native();
-            Path folder = path.parent_path();
-            Path::string_type folderStr;
-            do
-            {
-                archiveName = folder.stem().u8string() + ".dxa";
-                folder = folder.parent_path();
-                folderStr = fs::absolute(folder).native();
-
-                // find dxa file
-                Path dxa = folder / PathFromUTF8(archiveName);
-
-                // extract dxa
-                if (std::filesystem::is_regular_file(dxa))
-                {
-                    LOG_DEBUG << "[Skin] Extract dxa file: " << fs::absolute(dxa).u8string();
-                    extractDxaToFile(dxa);
-                    break;
-                }
-            } while (folderStr.length() >= lr2skinFolderStr.length() && folderStr.substr(0, lr2skinFolderStr.length()) == lr2skinFolderStr);
+            LR2FontNameMap[fontNameKey] = LR2FontCache[path];
+            LR2SkinFontPathCache[fontNameKey] = path;
+            return 1;
         }
 
+        findAndExtractDXA(path);
+
         if (!fs::is_regular_file(path))
         {
-            LR2FontNameMap[std::to_string(idx)] = nullptr;
+            LR2FontNameMap[fontNameKey] = nullptr;
             LOG_WARNING << "[Skin] " << csvLineNumber << ": LR2FONT file not found: " << path.u8string();
             return 1;
         }
@@ -737,6 +866,7 @@ int SkinLR2::LR2FONT()
 
                 // スキンcsvとは違って「lr2fontファイルからの相対参照」で画像ファイルを指定します。
                 Path p = path.parent_path() / Path(tokens[2]);
+                findAndExtractDXA(p);
                 pf->T_texture.push_back(std::make_shared<Texture>(Image(p.u8string().c_str())));
             }
             else if (strEqual(key, "#R", true))
@@ -777,16 +907,24 @@ int SkinLR2::LR2FONT()
                 r.w = toInt(tokens[5]);
                 r.h = toInt(tokens[6]);
 
-                pf->R[c_utf32] = {pf->T_id.at(imgId), r};
+                if (c_utf32 == U' ')
+                {
+                    // ID = space, LR2 displays a blank texture instead of actually texture file for spaces
+                    pf->R[c_utf32] = { size_t(-1), r };
+                }
+                else
+                {
+                    pf->R[c_utf32] = { pf->T_id.at(imgId), r };
+                }
             }
         }
 
         LR2FontCache[path] = pf;
-        LR2FontNameMap[std::to_string(idx)] = pf;
-        LOG_DEBUG << "[Skin] " << csvLineNumber << ": Added LR2FONT: " << path.u8string();
+        LR2FontNameMap[fontNameKey] = pf;
+        LR2SkinFontPathCache[fontNameKey] = path;
+        LOG_DEBUG << "[Skin] " << csvLineNumber << ": Added LR2FONT[" << fontNameKey << "]: " << path.u8string();
         return 1;
     }
-    return 0;
 }
 
 int SkinLR2::SYSTEMFONT()
@@ -818,7 +956,8 @@ int SkinLR2::INCLUDE()
 {
     if (strEqual(parseKeyBuf, "#INCLUDE", true))
     {
-        Path path(parseParamBuf[0]);
+        Path path = getCustomizePath(parseParamBuf[0]);
+
         LOG_DEBUG << "[Skin] " << csvLineNumber << ": INCLUDE: " << path.u8string();
         //auto subCsv = SkinLR2(path);
         //if (subCsv._loaded)
@@ -917,7 +1056,6 @@ int SkinLR2::others()
     if (strEqual(parseKeyBuf, "#RELOADBANNER", true))
     {
         reloadBanner = true;
-        LOG_DEBUG << "[Skin] " << csvLineNumber << ": Set dynamic banner loading";
         return 1;
     }
     if (strEqual(parseKeyBuf, "#TRANSCOLOR", true))
@@ -938,16 +1076,42 @@ int SkinLR2::others()
     if (strEqual(parseKeyBuf, "#FLIPSIDE", true))
     {
         flipSide = true;
+
+        switch (info.mode)
+        {
+        case eMode::PLAY5:
+        case eMode::PLAY5_2:
+        case eMode::PLAY7:
+        case eMode::PLAY7_2:
+        case eMode::PLAY9:
+        case eMode::PLAY10:
+        case eMode::PLAY14:
+            lr2skin::flipSideFlag = flipSide;
+            break;
+        }
+
         return 3;
     }
     if (strEqual(parseKeyBuf, "#FLIPRESULT", true))
     {
         flipResult = true;
+
+        if (info.mode == eMode::RESULT)
+        {
+            lr2skin::flipSideFlag = flipResult && !disableFlipResult;
+        }
+
         return 4;
     }
     if (strEqual(parseKeyBuf, "#DISABLEFLIP", true))
     {
         disableFlipResult = true;
+
+        if (info.mode == eMode::RESULT)
+        {
+            lr2skin::flipSideFlag = flipResult && !disableFlipResult;
+        }
+
         return 5;
     }
     if (strEqual(parseKeyBuf, "#SCRATCH", true))
@@ -1041,7 +1205,8 @@ bool SkinLR2::SRC()
         }
         else
         {
-            textureBuf = _textureNameMap["Error"];
+            // textureBuf = _textureNameMap["Error"];
+            textureBuf = std::make_shared<Texture>(nullptr, 0, 0);
             videoBuf = nullptr;
             useVideo = false;
         }
@@ -1060,14 +1225,14 @@ bool SkinLR2::SRC()
         case DefType::JUDGELINE:      SRC_JUDGELINE();           break;
         case DefType::TEXT:           SRC_TEXT();                break;
         case DefType::GROOVEGAUGE:    SRC_GROOVEGAUGE();         break;
-        case DefType::NOWJUDGE_1P:    SRC_NOWJUDGE1();           break;
-        case DefType::NOWJUDGE_2P:    SRC_NOWJUDGE2();           break;
-        case DefType::NOWCOMBO_1P:    SRC_NOWCOMBO1();           break;
-        case DefType::NOWCOMBO_2P:    SRC_NOWCOMBO2();           break;
+        case DefType::NOWJUDGE_1P:    lr2skin::flipSideFlag ? SRC_NOWJUDGE2() : SRC_NOWJUDGE1(); break;
+        case DefType::NOWJUDGE_2P:    lr2skin::flipSideFlag ? SRC_NOWJUDGE1() : SRC_NOWJUDGE2(); break;
+        case DefType::NOWCOMBO_1P:    lr2skin::flipSideFlag ? SRC_NOWCOMBO2() : SRC_NOWCOMBO1(); break;
+        case DefType::NOWCOMBO_2P:    lr2skin::flipSideFlag ? SRC_NOWCOMBO1() : SRC_NOWCOMBO2(); break;
         case DefType::BGA:            SRC_BGA();                 break;
         case DefType::MOUSECURSOR:    SRC_MOUSECURSOR();         break;
-        case DefType::GAUGECHART_1P:  SRC_GAUGECHART(0);         break;
-        case DefType::GAUGECHART_2P:  SRC_GAUGECHART(1);         break;
+        case DefType::GAUGECHART_1P:  SRC_GAUGECHART(lr2skin::flipSideFlag ? 1 : 0); break;
+        case DefType::GAUGECHART_2P:  SRC_GAUGECHART(lr2skin::flipSideFlag ? 0 : 1); break;
         case DefType::SCORECHART:     SRC_SCORECHART();          break;
         case DefType::BAR_BODY:       SRC_BAR_BODY();            break;
         case DefType::BAR_FLASH:      SRC_BAR_FLASH();           break;
@@ -1109,7 +1274,7 @@ ParseRet SkinLR2::SRC_IMAGE()
 #endif
     {
         _sprites.push_back(std::make_shared<SpriteAnimated>(
-            textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (eTimer)d.timer, d.div_y, d.div_x));
+            textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (IndexTimer)d.timer, d.div_y, d.div_x));
     }
 
     _sprites.back()->setSrcLine(csvLineNumber);
@@ -1121,7 +1286,7 @@ ParseRet SkinLR2::SRC_NUMBER()
 {
     lr2skin::s_number d(parseParamBuf, csvLineNumber);
 
-    eNumber iNum = lr2skin::num(d.num);
+    IndexNumber iNum = lr2skin::num(d.num);
 
     // get NumType from div_x, div_y
     unsigned f = d.div_y * d.div_x;
@@ -1135,32 +1300,32 @@ ParseRet SkinLR2::SRC_NUMBER()
     else f = 0;
 
     _sprites.emplace_back(std::make_shared<SpriteNumber>(
-        textureBuf, Rect(d.x, d.y, d.w, d.h), (NumberAlign)d.align, d.keta, d.div_y, d.div_x, d.cycle, iNum, (eTimer)d.timer, f));
+        textureBuf, Rect(d.x, d.y, d.w, d.h), (NumberAlign)d.align, d.keta, d.div_y, d.div_x, d.cycle, iNum, (IndexTimer)d.timer, f));
     _sprites.back()->setSrcLine(csvLineNumber);
 
     switch (iNum)
     {
-    case eNumber::LR2IR_REPLACE_PLAY_1P_JUDGE_TIME_ERROR_MS:
-    case eNumber::LR2IR_REPLACE_PLAY_2P_JUDGE_TIME_ERROR_MS:
-    case eNumber::LR2IR_REPLACE_PLAY_1P_FAST_SLOW:
-    case eNumber::LR2IR_REPLACE_PLAY_2P_FAST_SLOW:
-    case eNumber::LR2IR_REPLACE_PLAY_1P_FAST_COUNT:
-    case eNumber::LR2IR_REPLACE_PLAY_1P_SLOW_COUNT:
-    case eNumber::PLAY_1P_FAST_COUNT:
-    case eNumber::PLAY_1P_SLOW_COUNT:
-    case eNumber::PLAY_2P_FAST_COUNT:
-    case eNumber::PLAY_2P_SLOW_COUNT:
-    case eNumber::PLAY_1P_JUDGE_TIME_ERROR_MS:
-    case eNumber::PLAY_2P_JUDGE_TIME_ERROR_MS:
+    case IndexNumber::LR2IR_REPLACE_PLAY_1P_JUDGE_TIME_ERROR_MS:
+    case IndexNumber::LR2IR_REPLACE_PLAY_2P_JUDGE_TIME_ERROR_MS:
+    case IndexNumber::LR2IR_REPLACE_PLAY_1P_FAST_SLOW:
+    case IndexNumber::LR2IR_REPLACE_PLAY_2P_FAST_SLOW:
+    case IndexNumber::LR2IR_REPLACE_PLAY_1P_FAST_COUNT:
+    case IndexNumber::LR2IR_REPLACE_PLAY_1P_SLOW_COUNT:
+    case IndexNumber::PLAY_1P_FAST_COUNT:
+    case IndexNumber::PLAY_1P_SLOW_COUNT:
+    case IndexNumber::PLAY_2P_FAST_COUNT:
+    case IndexNumber::PLAY_2P_SLOW_COUNT:
+    case IndexNumber::PLAY_1P_JUDGE_TIME_ERROR_MS:
+    case IndexNumber::PLAY_2P_JUDGE_TIME_ERROR_MS:
         isSupportFastSlow = true;
         break;
 
-    case eNumber::GREEN_NUMBER_1P:
-    case eNumber::GREEN_NUMBER_2P:
-    case eNumber::GREEN_NUMBER_MAXBPM_1P:
-    case eNumber::GREEN_NUMBER_MAXBPM_2P:
-    case eNumber::GREEN_NUMBER_MINBPM_1P:
-    case eNumber::GREEN_NUMBER_MINBPM_2P:
+    case IndexNumber::GREEN_NUMBER_1P:
+    case IndexNumber::GREEN_NUMBER_2P:
+    case IndexNumber::GREEN_NUMBER_MAXBPM_1P:
+    case IndexNumber::GREEN_NUMBER_MAXBPM_2P:
+    case IndexNumber::GREEN_NUMBER_MINBPM_1P:
+    case IndexNumber::GREEN_NUMBER_MINBPM_2P:
         isSupportGreenNumber = true;
         break;
     }
@@ -1175,9 +1340,24 @@ ParseRet SkinLR2::SRC_SLIDER()
     _sprites.push_back(std::make_shared<SpriteSlider>(
         textureBuf, Rect(d.x, d.y, d.w, d.h), (SliderDirection)d.muki, d.range, 
         d.disable ? lr2skin::slider::getSliderCallback(-1) : lr2skin::slider::getSliderCallback(d.type),
-        d.div_y*d.div_x, d.cycle, (eSlider)d.type, (eTimer)d.timer, d.div_y, d.div_x));
+        d.div_y*d.div_x, d.cycle, (IndexSlider)d.type, (IndexTimer)d.timer, d.div_y, d.div_x));
     _sprites.back()->setSrcLine(csvLineNumber);
-    
+
+    switch ((IndexSlider)d.type)
+    {
+    case IndexSlider::SUD_1P:
+        spriteLanecoverTop1P = _sprites.back();
+        break;
+    case IndexSlider::SUD_2P:
+        spriteLanecoverTop1P = _sprites.back();
+        break;
+
+    case IndexSlider::HID_1P:
+    case IndexSlider::HID_2P:
+        isSupportLift = true;
+        break;
+    }
+
     return ParseRet::OK;
 }
 
@@ -1186,7 +1366,7 @@ ParseRet SkinLR2::SRC_BARGRAPH()
     lr2skin::s_bargraph d(parseParamBuf, csvLineNumber);
 
     _sprites.push_back(std::make_shared<SpriteBargraph>(
-        textureBuf, Rect(d.x, d.y, d.w, d.h), (BargraphDirection)d.muki, d.div_y*d.div_x, d.cycle, (eBargraph)d.type, (eTimer)d.timer, d.div_y, d.div_x));
+        textureBuf, Rect(d.x, d.y, d.w, d.h), (BargraphDirection)d.muki, d.div_y*d.div_x, d.cycle, (IndexBargraph)d.type, (IndexTimer)d.timer, d.div_y, d.div_x));
     _sprites.back()->setSrcLine(csvLineNumber);
 
     return ParseRet::OK;
@@ -1203,18 +1383,18 @@ ParseRet SkinLR2::SRC_BUTTON()
         if (d.click)
         {
             s = std::make_shared<SpriteButton>(
-                textureBuf, Rect(d.x, d.y, d.w, d.h), 1, 0, lr2skin::button::getButtonCallback(d.type), d.panel, d.plusonly, eTimer::SCENE_START, d.div_y, d.div_x, false);
+                textureBuf, Rect(d.x, d.y, d.w, d.h), 1, 0, lr2skin::button::getButtonCallback(d.type), d.panel, d.plusonly, IndexTimer::SCENE_START, d.div_y, d.div_x, false);
         }
         else
         {
             s = std::make_shared<SpriteOption>(
-                textureBuf, Rect(d.x, d.y, d.w, d.h), 1, 0, eTimer::SCENE_START, d.div_y, d.div_x, false);
+                textureBuf, Rect(d.x, d.y, d.w, d.h), 1, 0, IndexTimer::SCENE_START, d.div_y, d.div_x, false);
         }
-        eSwitch sw;
-        eOption op;
+        IndexSwitch sw;
+        IndexOption op;
         if (lr2skin::buttonSw(d.type, sw))
         {
-            if (sw == eSwitch::_TRUE)
+            if (sw == IndexSwitch::_TRUE)
             {
                 switch (d.type)
                 {
@@ -1234,10 +1414,15 @@ ParseRet SkinLR2::SRC_BUTTON()
 
             if (info.mode == eMode::MUSIC_SELECT)
             {
-                if (op == eOption::PLAY_GAUGE_TYPE_1P || op == eOption::PLAY_GAUGE_TYPE_2P)
+                if (op == IndexOption::PLAY_GAUGE_TYPE_1P || op == IndexOption::PLAY_GAUGE_TYPE_2P)
                 {
                     if (d.div_x * d.div_y >= 6)
                         isSupportExHardAndAssistEasy = true;
+                }
+                if (op == IndexOption::PLAY_LANE_EFFECT_TYPE_1P || op == IndexOption::PLAY_LANE_EFFECT_TYPE_2P)
+                {
+                    if (d.div_x * d.div_y >= 6)
+                        isSupportLift = true;
                 }
             }
         }
@@ -1246,10 +1431,10 @@ ParseRet SkinLR2::SRC_BUTTON()
     }
     else
     {
-        // deal as eSwitch::_FALSE
+        // deal as IndexSwitch::_FALSE
         auto s = std::make_shared<SpriteOption>(
-            textureBuf, Rect(d.x, d.y, d.w, d.h), 1, 0, eTimer::SCENE_START, d.div_y, d.div_x, false);
-        s->setInd(SpriteOption::opType::SWITCH, (unsigned)eSwitch::_FALSE);
+            textureBuf, Rect(d.x, d.y, d.w, d.h), 1, 0, IndexTimer::SCENE_START, d.div_y, d.div_x, false);
+        s->setInd(SpriteOption::opType::SWITCH, (unsigned)IndexSwitch::_FALSE);
         _sprites.push_back(s);
         _sprites.back()->setSrcLine(csvLineNumber);
     }
@@ -1262,7 +1447,7 @@ ParseRet SkinLR2::SRC_ONMOUSE()
     lr2skin::s_onmouse d(parseParamBuf, csvLineNumber);
 
     _sprites.push_back(std::make_shared<SpriteOnMouse>(
-        textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, d.panel, Rect(d.x2, d.y2, d.w2, d.h2), (eTimer)d.timer, d.div_y, d.div_x));
+        textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, d.panel, Rect(d.x2, d.y2, d.w2, d.h2), (IndexTimer)d.timer, d.div_y, d.div_x));
     _sprites.back()->setSrcLine(csvLineNumber);
 
     return ParseRet::OK;
@@ -1273,7 +1458,7 @@ ParseRet SkinLR2::SRC_MOUSECURSOR()
     lr2skin::s_mousecursor d(parseParamBuf, csvLineNumber);
 
     _sprites.push_back(std::make_shared<SpriteCursor>(
-        textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (eTimer)d.timer, d.div_y, d.div_x));
+        textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (IndexTimer)d.timer, d.div_y, d.div_x));
     _sprites.back()->setSrcLine(csvLineNumber);
 
     return ParseRet::OK;
@@ -1287,18 +1472,26 @@ ParseRet SkinLR2::SRC_TEXT()
     if (LR2FontNameMap.find(font) != LR2FontNameMap.end() && LR2FontNameMap[font] != nullptr)
     {
         auto& pf = LR2FontNameMap[font];
-        auto ps = std::make_shared<SpriteImageText>(pf->T_texture, pf->R, (eText)d.st, (TextAlign)d.align, pf->S, pf->M);
+        auto ps = std::make_shared<SpriteImageText>(pf->T_texture, &pf->R, (IndexText)d.st, (TextAlign)d.align, pf->S, pf->M);
         if (d.edit) ps->setEditable(true);
         _sprites.push_back(ps);
     }
     else
     {
-        auto ps = std::make_shared<SpriteText>(_fontNameMap[std::to_string(d.font)], (eText)d.st, (TextAlign)d.align);
+        auto ps = std::make_shared<SpriteText>(_fontNameMap[std::to_string(d.font)], (IndexText)d.st, (TextAlign)d.align);
         if (d.edit) ps->setEditable(true);
         _sprites.push_back(ps);
     }
 
     _sprites.back()->setSrcLine(csvLineNumber);
+
+    switch (d.st)
+    {
+    case 84:
+    case 85:
+        isSupportLift = true;
+        break;
+    }
 
     return ParseRet::OK;
 }
@@ -1316,7 +1509,7 @@ ParseRet SkinLR2::SRC_GAUGECHART(int player)
     }
 
     _sprites.push_back(std::make_shared<SpriteLine>(
-        player == 0 ? PLAYER_SLOT_1P : PLAYER_SLOT_2P,
+        player == 0 ? PLAYER_SLOT_PLAYER : PLAYER_SLOT_TARGET,
         type,
         d.field_w, d.field_h, d.start, d.end, 1));
 
@@ -1334,7 +1527,7 @@ ParseRet SkinLR2::SRC_SCORECHART()
     switch (d._null)
     {
     case 0:type = LineType::SCORE; color = {20, 20, 255, 255};  break;
-    case 1: type = LineType::SCORE; color = { 20, 255, 20, 255 };   break;
+    case 1: type = LineType::SCORE_MYBEST; color = { 20, 255, 20, 255 };   break;
     case 2: type = LineType::SCORE_TARGET; color = { 255, 20, 20, 255 };   break;
     default: break;
     }
@@ -1355,6 +1548,10 @@ ParseRet SkinLR2::SRC_SCORECHART()
 ParseRet SkinLR2::SRC_JUDGELINE()
 {
     lr2skin::s_basic d(parseParamBuf, csvLineNumber);
+    if (lr2skin::flipSideFlag)
+    {
+        d._null = (d._null == 0) ? 1 : 0;
+    }
 
     int spriteIdx = -1;
     switch (d._null)
@@ -1370,7 +1567,7 @@ ParseRet SkinLR2::SRC_JUDGELINE()
     }
 
     gSprites[spriteIdx] = std::make_shared<SpriteAnimated>(
-        textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (eTimer)d.timer, d.div_y, d.div_x);
+        textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (IndexTimer)d.timer, d.div_y, d.div_x);
     gSprites[spriteIdx]->setSrcLine(csvLineNumber);
 
     auto p = std::make_shared<SpriteGlobal>(spriteIdx);
@@ -1391,7 +1588,7 @@ ParseRet SkinLR2::SRC_NOWJUDGE(size_t idx)
     lr2skin::s_basic d(parseParamBuf, csvLineNumber);
 
     gSprites[idx] = std::make_shared<SpriteAnimated>(
-        textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (eTimer)d.timer, d.div_y, d.div_x);
+        textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (IndexTimer)d.timer, d.div_y, d.div_x);
     gSprites[idx]->setSrcLine(csvLineNumber);
 
     return ParseRet::OK;
@@ -1407,7 +1604,7 @@ ParseRet SkinLR2::SRC_NOWCOMBO(size_t idx)
 
     lr2skin::s_number d(parseParamBuf, csvLineNumber);
 
-    eNumber iNum = lr2skin::num(d.num);
+    IndexNumber iNum = lr2skin::num(d.num);
 
     // get NumType from div_x, div_y
     unsigned f = d.div_y * d.div_x;
@@ -1417,7 +1614,7 @@ ParseRet SkinLR2::SRC_NOWCOMBO(size_t idx)
     else f = 0;
 
     gSprites[idx] = std::make_shared<SpriteNumber>(
-        textureBuf, Rect(d.x, d.y, d.w, d.h), (NumberAlign)d.align, d.keta, d.div_y, d.div_x, d.cycle, iNum, (eTimer)d.timer, f);
+        textureBuf, Rect(d.x, d.y, d.w, d.h), (NumberAlign)d.align, d.keta, d.div_y, d.div_x, d.cycle, iNum, (IndexTimer)d.timer, f);
     gSprites[idx]->setSrcLine(csvLineNumber);
     std::reinterpret_pointer_cast<SpriteNumber>(gSprites[idx])->setInhibitZero(true);
 
@@ -1435,11 +1632,11 @@ ParseRet SkinLR2::SRC_GROOVEGAUGE()
     }
 
     size_t idx = d._null == 0 ? GLOBAL_SPRITE_IDX_1PGAUGE : GLOBAL_SPRITE_IDX_2PGAUGE;
-    eNumber en = d._null == 0 ? eNumber::PLAY_1P_GROOVEGAUGE : eNumber::PLAY_2P_GROOVEGAUGE;
+    IndexNumber en = d._null == 0 ? IndexNumber::PLAY_1P_GROOVEGAUGE : IndexNumber::PLAY_2P_GROOVEGAUGE;
 
     gSprites[idx] = std::make_shared<SpriteGaugeGrid>(
         textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x / 4, d.cycle, d.add_x, d.add_y, 0, 100, 50,
-        (eTimer)d.timer, en, d.div_y, d.div_x);
+        (IndexTimer)d.timer, en, d.div_y, d.div_x);
     gSprites[idx]->setSrcLine(csvLineNumber);
 
     auto p = std::make_shared<SpriteGlobal>(idx);
@@ -1504,15 +1701,10 @@ ParseRet SkinLR2::SRC_NOWCOMBO1()
 
     bufJudge1PSlot = d._null;
     // modify necessary info for SRC_NOWCOMBO(idx)
-    static StringContent eNumBuf = std::to_string((int)eNumber::_DISP_NOWCOMBO_1P);
+    static StringContent eNumBuf = std::to_string((int)IndexNumber::_DISP_NOWCOMBO_1P);
     parseParamBuf[10] = StringContentView(eNumBuf);
-    switch (toInt(parseParamBuf[11]))
-    {
-    case 0: parseParamBuf[11] = "1"; break;
-    case 1: parseParamBuf[11] = "2"; break;
-    case 2:
-    default:parseParamBuf[11] = "0"; break;
-    }
+    alignNowCombo1P[bufJudge1PSlot] = toInt(parseParamBuf[11]);
+    parseParamBuf[11] = "1";
 
     if (bufJudge1PSlot >= 0 && bufJudge1PSlot < 6)
     {
@@ -1538,15 +1730,10 @@ ParseRet SkinLR2::SRC_NOWCOMBO2()
 
     bufJudge2PSlot = d._null;
     // modify necessary info for SRC_NOWCOMBO(idx)
-    static StringContent eNumBuf = std::to_string((int)eNumber::_DISP_NOWCOMBO_2P);
+    static StringContent eNumBuf = std::to_string((int)IndexNumber::_DISP_NOWCOMBO_2P);
     parseParamBuf[10] = StringContentView(eNumBuf);
-    switch (toInt(parseParamBuf[11]))
-    {
-    case 0: parseParamBuf[11] = "1"; break;
-    case 1: parseParamBuf[11] = "2"; break;
-    case 2: 
-    default:parseParamBuf[11] = "0"; break;
-    }
+    alignNowCombo2P[bufJudge2PSlot] = toInt(parseParamBuf[11]);
+    parseParamBuf[11] = "1";
 
     if (bufJudge2PSlot >= 0 && bufJudge2PSlot < 6)
     {
@@ -1566,30 +1753,63 @@ ParseRet SkinLR2::SRC_NOWCOMBO2()
     return ParseRet::OK;
 }
 
-const size_t NoteIdxToLaneMap[] =
+chart::NoteLaneIndex NoteIdxToLane(eMode gamemode, int idx)
 {
-    chart::Sc1,
-    chart::K1,
-    chart::K2,
-    chart::K3,
-    chart::K4,
-    chart::K5,
-    chart::K6,
-    chart::K7,
-    chart::_,
-    chart::_,
+    assert(idx < 20);
 
-    chart::Sc2,
-    chart::K8,
-    chart::K9,
-    chart::K10,
-    chart::K11,
-    chart::K12,
-    chart::K13,
-    chart::K14,
-    chart::_,
-    chart::_,
-};
+    using namespace chart;
+    switch (gamemode)
+    {
+    case eMode::PLAY5:
+    {
+        static const NoteLaneIndex lane[] =
+        {
+            Sc1, K1, K2, K3, K4, K5, _, _, _, _,
+            _, _, _, _, _, _, _, _, _, _,
+        };
+        return lane[idx];
+    }
+    case eMode::PLAY7:
+    {
+        static const NoteLaneIndex lane[] =
+        {
+            Sc1, K1, K2, K3, K4, K5, K6, K7, _, _,
+            _, _, _, _, _, _, _, _, _, _,
+        };
+        return lane[idx];
+    }
+    case eMode::PLAY9:
+    {
+        static const NoteLaneIndex lane[] =
+        {
+            _, K1, K2, K3, K4, K5, K6, K7, K8, K9,
+            _, _, _, _, _, _, _, _, _, _,
+        };
+        return lane[idx];
+    }
+    case eMode::PLAY5_2:
+    case eMode::PLAY10:
+    {
+        static const NoteLaneIndex lane[] =
+        {
+            Sc1, K1, K2, K3, K4, K5, _, _, _, _,
+            Sc2, K6, K7, K8, K9, K10, _, _, _, _,
+        };
+        return lane[idx];
+    }
+    case eMode::PLAY7_2:
+    case eMode::PLAY14:
+    {
+        static const NoteLaneIndex lane[] =
+        {
+            Sc1, K1, K2, K3, K4, K5, K6, K7, _, _,
+            Sc2, K8, K9, K10, K11, K12, K13, K14, _, _,
+        };
+        return lane[idx];
+    }
+    }
+    return _;
+}
 
 ParseRet SkinLR2::SRC_NOTE(DefType type)
 {
@@ -1597,8 +1817,15 @@ ParseRet SkinLR2::SRC_NOTE(DefType type)
 
     // load raw into data struct
     lr2skin::s_basic d(parseParamBuf, csvLineNumber);
+    if (lr2skin::flipSideFlag)
+    {
+        if (type == DefType::LINE)
+        {
+            d._null = (d._null == 0) ? 1 : 0;
+        }
+    }
 
-    eTimer iTimer = lr2skin::timer(d.timer);
+    IndexTimer iTimer = lr2skin::timer(d.timer);
 
     // Find texture from map by gr
     pTexture tex = nullptr;
@@ -1620,6 +1847,7 @@ ParseRet SkinLR2::SRC_NOTE(DefType type)
 
     NoteLaneCategory cat = NoteLaneCategory::_;
     NoteLaneIndex idx = NoteLaneIndex::_;
+    bool autoNotes = false;
 
     // SRC_NOTE
     switch (type)
@@ -1628,28 +1856,42 @@ ParseRet SkinLR2::SRC_NOTE(DefType type)
         cat = NoteLaneCategory::EXTRA;
         idx = (NoteLaneIndex)(d._null == 0 ? EXTRA_BARLINE_1P : EXTRA_BARLINE_2P);
         break;
+
     case DefType::NOTE:
         cat = NoteLaneCategory::Note;
-        idx = (NoteLaneIndex)NoteIdxToLaneMap[d._null];
+        idx = NoteIdxToLane(info.mode, d._null);
         break;
     case DefType::LN_END:
     case DefType::LN_BODY:
     case DefType::LN_START:
         cat = NoteLaneCategory::LN;
-        idx = (NoteLaneIndex)NoteIdxToLaneMap[d._null];
+        idx = NoteIdxToLane(info.mode, d._null);
         break;
     case DefType::MINE:
         cat = NoteLaneCategory::Mine;
-        idx = (NoteLaneIndex)NoteIdxToLaneMap[d._null];
+        idx = NoteIdxToLane(info.mode, d._null);
         break;
+
     case DefType::AUTO_NOTE:
-    case DefType::AUTO_MINE:
+        cat = NoteLaneCategory::Note;
+        idx = NoteIdxToLane(info.mode, d._null);
+        autoNotes = true;
+        break;
     case DefType::AUTO_LN_END:
     case DefType::AUTO_LN_BODY:
     case DefType::AUTO_LN_START:
+        cat = NoteLaneCategory::LN;
+        idx = NoteIdxToLane(info.mode, d._null);
+        autoNotes = true;
+        break;
+    case DefType::AUTO_MINE:
+        cat = NoteLaneCategory::Mine;
+        idx = NoteIdxToLane(info.mode, d._null);
+        autoNotes = true;
+        break;
+
     default:
-        LOG_WARNING << "[Skin] " << csvLineNumber << ": \"" << parseKeyBuf << "\" is not supported yet";
-        return ParseRet::OK;
+        return ParseRet::SRC_DEF_INVALID;
     }
 
     size_t i = channelToIdx(cat, idx);
@@ -1666,11 +1908,13 @@ ParseRet SkinLR2::SRC_NOTE(DefType type)
         _sprites.push_back(std::make_shared<SpriteLaneVertical>(
             _textureNameMap[gr_key], Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, iTimer, d.div_y, d.div_x, false, d._null == 0 ? 0 : 1));
 
-        _laneSprites[i] = std::static_pointer_cast<SpriteLaneVertical>(_sprites.back());
-        _laneSprites[i]->setLane(cat, idx);
-        _laneSprites[i]->pNote->appendKeyFrame({ 0, {Rect(),
+        auto& ls = _laneSprites[i].first;
+
+        ls = std::static_pointer_cast<SpriteLaneVertical>(_sprites.back());
+        ls->setLane(cat, idx);
+        ls->pNote->appendKeyFrame({ 0, {Rect(),
             RenderParams::accTy::CONSTANT, Color(0xffffffff), BlendMode::ALPHA, 0, 0.0 } });
-        _laneSprites[i]->pNote->setLoopTime(0);
+        ls->pNote->setLoopTime(0);
         break;
     }
 
@@ -1680,13 +1924,23 @@ ParseRet SkinLR2::SRC_NOTE(DefType type)
     case DefType::AUTO_MINE:
     {
         _sprites.push_back(std::make_shared<SpriteLaneVertical>(
-            _textureNameMap[gr_key], Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, iTimer, d.div_y, d.div_x, false, !!(d._null >= 20)));
+            _textureNameMap[gr_key], Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, iTimer, d.div_y, d.div_x, false, !!(d._null >= 10), autoNotes));
 
-        _laneSprites[i] = std::static_pointer_cast<SpriteLaneVertical>(_sprites.back());
-        _laneSprites[i]->setLane(cat, idx);
-        _laneSprites[i]->pNote->appendKeyFrame({ 0, {Rect(),
+        std::shared_ptr<SpriteLaneVertical> ls = nullptr;
+        if (!autoNotes)
+        {
+            _laneSprites[i].first = std::static_pointer_cast<SpriteLaneVertical>(_sprites.back());
+            ls = _laneSprites[i].first;
+        }
+        else
+        {
+            _laneSprites[i].second = std::static_pointer_cast<SpriteLaneVertical>(_sprites.back());
+            ls = _laneSprites[i].second;
+        }
+        ls->setLane(cat, idx);
+        ls->pNote->appendKeyFrame({ 0, {Rect(),
             RenderParams::accTy::CONSTANT, Color(0xffffffff), BlendMode::ALPHA, 0, 0.0 } });
-        _laneSprites[i]->pNote->setLoopTime(0);
+        ls->pNote->setLoopTime(0);
         break;
     }
 
@@ -1697,14 +1951,27 @@ ParseRet SkinLR2::SRC_NOTE(DefType type)
     case DefType::AUTO_LN_BODY:
     case DefType::AUTO_LN_START:
     {
-        if (_laneSprites[i] == nullptr)
+        std::shared_ptr<SpriteLaneVerticalLN> p = nullptr;
+        if (!autoNotes)
         {
-            _sprites.push_back(std::make_shared<SpriteLaneVerticalLN>(!!(d._null >= 20)));
-            _laneSprites[i] = std::static_pointer_cast<SpriteLaneVerticalLN>(_sprites.back());
-            _laneSprites[i]->setLane(cat, idx);
+            if (_laneSprites[i].first == nullptr)
+            {
+                _sprites.push_back(std::make_shared<SpriteLaneVerticalLN>(!!(d._null >= 10), false));
+                _laneSprites[i].first = std::static_pointer_cast<SpriteLaneVerticalLN>(_sprites.back());
+                _laneSprites[i].first->setLane(cat, idx);
+            }
+            p = std::static_pointer_cast<SpriteLaneVerticalLN>(_laneSprites[i].first);
         }
-
-        auto p = std::static_pointer_cast<SpriteLaneVerticalLN>(_laneSprites[i]);
+        else
+        {
+            if (_laneSprites[i].second == nullptr)
+            {
+                _sprites.push_back(std::make_shared<SpriteLaneVerticalLN>(!!(d._null >= 10), true));
+                _laneSprites[i].second = std::static_pointer_cast<SpriteLaneVerticalLN>(_sprites.back());
+                _laneSprites[i].second->setLane(cat, idx);
+            }
+            p = std::static_pointer_cast<SpriteLaneVerticalLN>(_laneSprites[i].second);
+        }
         std::shared_ptr<SpriteAnimated> *pn = nullptr;
         switch (type)
         {
@@ -1766,17 +2033,17 @@ ParseRet SkinLR2::SRC_BAR_BODY()
     case 8:  type = BarType::COURSE; break;
     case 9:  type = BarType::RANDOM_COURSE; break;
     case 10: type = BarType::TYPE_COUNT; break;
-    default: break;
+    default: return ParseRet::PARAM_INVALID;
     }
 
     for (auto& bar : _barSprites)
     {
         bar->setBody(type,
-            textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (eTimer)d.timer, d.div_y, d.div_x);
+            textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (IndexTimer)d.timer, d.div_y, d.div_x);
 
         if (type == BarType::SONG)
             bar->setBody(BarType::NEW_SONG,
-                textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (eTimer)d.timer, d.div_y, d.div_x);
+                textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (IndexTimer)d.timer, d.div_y, d.div_x);
     }
 
     return ParseRet::OK;
@@ -1788,7 +2055,7 @@ ParseRet SkinLR2::SRC_BAR_FLASH()
 
     for (auto& bar : _barSprites)
     {
-        bar->setFlash(textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (eTimer)d.timer, d.div_y, d.div_x);
+        bar->setFlash(textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (IndexTimer)d.timer, d.div_y, d.div_x);
     }
 
     return ParseRet::OK;
@@ -1810,7 +2077,7 @@ ParseRet SkinLR2::SRC_BAR_LEVEL()
     for (auto& bar : _barSprites)
     {
         bar->setLevel(type,
-            textureBuf, Rect(d.x, d.y, d.w, d.h), (NumberAlign)d.align, d.keta, d.div_y, d.div_x, d.cycle, (eTimer)d.timer, f);
+            textureBuf, Rect(d.x, d.y, d.w, d.h), (NumberAlign)d.align, d.keta, d.div_y, d.div_x, d.cycle, (IndexTimer)d.timer, f);
     }
 
     return ParseRet::OK;
@@ -1824,7 +2091,7 @@ ParseRet SkinLR2::SRC_BAR_LAMP()
 
     for (auto& bar : _barSprites)
     {
-        bar->setLamp(type, textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (eTimer)d.timer, d.div_y, d.div_x);
+        bar->setLamp(type, textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (IndexTimer)d.timer, d.div_y, d.div_x);
     }
 
     return ParseRet::OK;
@@ -1841,7 +2108,7 @@ ParseRet SkinLR2::SRC_BAR_TITLE()
         if (LR2FontNameMap.find(font) != LR2FontNameMap.end() && LR2FontNameMap[font] != nullptr)
         {
             auto& pf = LR2FontNameMap[font];
-            bar->setTitle(type, pf->T_texture, pf->R, (TextAlign)d.align, pf->S, pf->M);
+            bar->setTitle(type, pf->T_texture, &pf->R, (TextAlign)d.align, pf->S, pf->M);
         }
         else
         {
@@ -1860,7 +2127,7 @@ ParseRet SkinLR2::SRC_BAR_RANK()
 
     for (auto& bar : _barSprites)
     {
-        bar->setRank(type, textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (eTimer)d.timer, d.div_y, d.div_x);
+        bar->setRank(type, textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (IndexTimer)d.timer, d.div_y, d.div_x);
     }
 
     return ParseRet::OK;
@@ -1874,7 +2141,7 @@ ParseRet SkinLR2::SRC_BAR_RIVAL()
 
     for (auto& bar : _barSprites)
     {
-        bar->setRivalWinLose(type, textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (eTimer)d.timer, d.div_y, d.div_x);
+        bar->setRivalWinLose(type, textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (IndexTimer)d.timer, d.div_y, d.div_x);
     }
 
     return ParseRet::OK;
@@ -1888,7 +2155,7 @@ ParseRet SkinLR2::SRC_BAR_RIVAL_MYLAMP()
 
     for (auto& bar : _barSprites)
     {
-        bar->setRivalLampSelf(type, textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (eTimer)d.timer, d.div_y, d.div_x);
+        bar->setRivalLampSelf(type, textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (IndexTimer)d.timer, d.div_y, d.div_x);
     }
 
     return ParseRet::OK;
@@ -1902,7 +2169,7 @@ ParseRet SkinLR2::SRC_BAR_RIVAL_RIVALLAMP()
 
     for (auto& bar : _barSprites)
     {
-        bar->setRivalLampRival(type, textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (eTimer)d.timer, d.div_y, d.div_x);
+        bar->setRivalLampRival(type, textureBuf, Rect(d.x, d.y, d.w, d.h), d.div_y * d.div_x, d.cycle, (IndexTimer)d.timer, d.div_y, d.div_x);
     }
 
     return ParseRet::OK;
@@ -1961,13 +2228,14 @@ bool SkinLR2::DST()
             return false;
         }
 
-        // TODO check if type of previous src definition matches
-
-        if (e->type() == SpriteTypes::GLOBAL)
+        std::shared_ptr<SpriteGlobal> psGlobal = nullptr;
+        SpriteTypes sType = e->type();
+        if (sType == SpriteTypes::GLOBAL)
         {
             // unpack stacking references
             auto p = std::reinterpret_pointer_cast<SpriteGlobal>(e);
-            auto enext = e;
+            psGlobal = p;
+            decltype(e) enext = nullptr;
             do
             {
                 enext = gSprites[p->getIdx()];
@@ -1978,41 +2246,123 @@ bool SkinLR2::DST()
                     LOG_WARNING << "[Skin] " << csvLineNumber << ": Previous src definition invalid (Line: " << csvLineNumber << ")";
                     return false;
                 }
+                sType = enext->type();
 
-            } while (enext->type() == SpriteTypes::GLOBAL);
+            } while (sType == SpriteTypes::GLOBAL);
+        }
+
+        // check if type of previous src definition matches
+        bool typeMatch = true;
+        switch (type)
+        {
+        case DefType::IMAGE:         typeMatch = (sType == SpriteTypes::ANIMATED || sType == SpriteTypes::VIDEO); break;
+        case DefType::NUMBER:        typeMatch = sType == SpriteTypes::NUMBER; break;
+        case DefType::SLIDER:        typeMatch = sType == SpriteTypes::SLIDER; break;
+        case DefType::BARGRAPH:      typeMatch = sType == SpriteTypes::BARGRAPH; break;
+        case DefType::BUTTON:        typeMatch = (sType == SpriteTypes::BUTTON || sType == SpriteTypes::OPTION); break;
+        case DefType::ONMOUSE:       typeMatch = sType == SpriteTypes::ONMOUSE; break;
+        case DefType::TEXT:          typeMatch = (sType == SpriteTypes::TEXT || sType == SpriteTypes::IMAGE_TEXT); break;
+        case DefType::JUDGELINE:     typeMatch = sType == SpriteTypes::ANIMATED; break;
+        case DefType::GROOVEGAUGE:   typeMatch = sType == SpriteTypes::GAUGE; break;
+        case DefType::NOWJUDGE_1P:   typeMatch = sType == SpriteTypes::ANIMATED; break;
+        case DefType::NOWCOMBO_1P:   typeMatch = sType == SpriteTypes::NUMBER; break;
+        case DefType::NOWJUDGE_2P:   typeMatch = sType == SpriteTypes::ANIMATED; break;
+        case DefType::NOWCOMBO_2P:   typeMatch = sType == SpriteTypes::NUMBER; break;
+        case DefType::BGA:           typeMatch = sType == SpriteTypes::STATIC; break;
+        case DefType::MOUSECURSOR:   typeMatch = sType == SpriteTypes::MOUSE_CURSOR; break;
+        case DefType::GAUGECHART_1P: typeMatch = sType == SpriteTypes::LINE; break;
+        case DefType::GAUGECHART_2P: typeMatch = sType == SpriteTypes::LINE; break;
+        case DefType::SCORECHART:    typeMatch = sType == SpriteTypes::LINE; break;
+        }
+        if (!typeMatch)
+        {
+            LOG_WARNING << "[Skin] " << csvLineNumber << ": Previous src definition type mismatch (Line: " << csvLineNumber << ")";
+            return false;
         }
 
         if (e->isKeyFrameEmpty())
         {
-            switch (type)
+            if (lr2skin::flipSideFlag)
             {
-            case DefType::NOWCOMBO_1P:
-            case DefType::NOWJUDGE_1P:
-                switch (bufJudge1PSlot)
+                switch (type)
                 {
-                case 0: d.timer = (int)eTimer::_JUDGE_1P_0; break;
-                case 1: d.timer = (int)eTimer::_JUDGE_1P_1; break;
-                case 2: d.timer = (int)eTimer::_JUDGE_1P_2; break;
-                case 3: d.timer = (int)eTimer::_JUDGE_1P_3; break;
-                case 4: d.timer = (int)eTimer::_JUDGE_1P_4; break;
-                case 5: d.timer = (int)eTimer::_JUDGE_1P_5; break;
-                default: break;
-                }
-                break;
+                case DefType::NOWCOMBO_2P:
+                case DefType::NOWJUDGE_2P:
+                    switch (bufJudge1PSlot)
+                    {
+                    case 0: d.timer = (int)IndexTimer::_JUDGE_1P_0; break;
+                    case 1: d.timer = (int)IndexTimer::_JUDGE_1P_1; break;
+                    case 2: d.timer = (int)IndexTimer::_JUDGE_1P_2; break;
+                    case 3: d.timer = (int)IndexTimer::_JUDGE_1P_3; break;
+                    case 4: d.timer = (int)IndexTimer::_JUDGE_1P_4; break;
+                    case 5: d.timer = (int)IndexTimer::_JUDGE_1P_5; break;
+                    default: break;
+                    }
+                    break;
 
-            case DefType::NOWCOMBO_2P:
-            case DefType::NOWJUDGE_2P:
-                switch (bufJudge2PSlot)
-                {
-                case 0: d.timer = (int)eTimer::_JUDGE_2P_0; break;
-                case 1: d.timer = (int)eTimer::_JUDGE_2P_1; break;
-                case 2: d.timer = (int)eTimer::_JUDGE_2P_2; break;
-                case 3: d.timer = (int)eTimer::_JUDGE_2P_3; break;
-                case 4: d.timer = (int)eTimer::_JUDGE_2P_4; break;
-                case 5: d.timer = (int)eTimer::_JUDGE_2P_5; break;
-                default: break;
+                case DefType::NOWCOMBO_1P:
+                case DefType::NOWJUDGE_1P:
+                    switch (bufJudge2PSlot)
+                    {
+                    case 0: d.timer = (int)IndexTimer::_JUDGE_2P_0; break;
+                    case 1: d.timer = (int)IndexTimer::_JUDGE_2P_1; break;
+                    case 2: d.timer = (int)IndexTimer::_JUDGE_2P_2; break;
+                    case 3: d.timer = (int)IndexTimer::_JUDGE_2P_3; break;
+                    case 4: d.timer = (int)IndexTimer::_JUDGE_2P_4; break;
+                    case 5: d.timer = (int)IndexTimer::_JUDGE_2P_5; break;
+                    default: break;
+                    }
+                    break;
                 }
-                break;
+            }
+            else
+            {
+                switch (type)
+                {
+                case DefType::NOWCOMBO_1P:
+                case DefType::NOWJUDGE_1P:
+                    switch (bufJudge1PSlot)
+                    {
+                    case 0: d.timer = (int)IndexTimer::_JUDGE_1P_0; break;
+                    case 1: d.timer = (int)IndexTimer::_JUDGE_1P_1; break;
+                    case 2: d.timer = (int)IndexTimer::_JUDGE_1P_2; break;
+                    case 3: d.timer = (int)IndexTimer::_JUDGE_1P_3; break;
+                    case 4: d.timer = (int)IndexTimer::_JUDGE_1P_4; break;
+                    case 5: d.timer = (int)IndexTimer::_JUDGE_1P_5; break;
+                    default: break;
+                    }
+                    break;
+
+                case DefType::NOWCOMBO_2P:
+                case DefType::NOWJUDGE_2P:
+                    switch (bufJudge2PSlot)
+                    {
+                    case 0: d.timer = (int)IndexTimer::_JUDGE_2P_0; break;
+                    case 1: d.timer = (int)IndexTimer::_JUDGE_2P_1; break;
+                    case 2: d.timer = (int)IndexTimer::_JUDGE_2P_2; break;
+                    case 3: d.timer = (int)IndexTimer::_JUDGE_2P_3; break;
+                    case 4: d.timer = (int)IndexTimer::_JUDGE_2P_4; break;
+                    case 5: d.timer = (int)IndexTimer::_JUDGE_2P_5; break;
+                    default: break;
+                    }
+                    break;
+                }
+            }
+
+            if (type == DefType::JUDGELINE)
+            {
+                if (psGlobal->getIdx() == GLOBAL_SPRITE_IDX_1PJUDGELINE)
+                {
+                    judgeLineRect1P = Rect(d.x, d.y, d.w, d.h);
+                    if (d.w < 0) { judgeLineRect1P.x += d.w; judgeLineRect1P.w = -d.w; }
+                    if (d.h < 0) { judgeLineRect1P.y += d.h; judgeLineRect1P.h = -d.h; }
+                }
+                else if (psGlobal->getIdx() == GLOBAL_SPRITE_IDX_2PJUDGELINE)
+                {
+                    judgeLineRect2P = Rect(d.x, d.y, d.w, d.h);
+                    if (d.w < 0) { judgeLineRect2P.x += d.w; judgeLineRect2P.w = -d.w; }
+                    if (d.h < 0) { judgeLineRect2P.y += d.h; judgeLineRect2P.h = -d.h; }
+                }
             }
 
             std::vector<dst_option> opEx;
@@ -2021,17 +2371,17 @@ bool SkinLR2::DST()
                 auto p = std::reinterpret_pointer_cast<SpriteNumber>(e);
                 switch (p->_numInd)
                 {
-                case eNumber::MUSIC_BEGINNER_LEVEL:  opEx.push_back(dst_option::SELECT_HAVE_BEGINNER_IN_SAME_FOLDER); break;
-                case eNumber::MUSIC_NORMAL_LEVEL:    opEx.push_back(dst_option::SELECT_HAVE_NORMAL_IN_SAME_FOLDER);   break;
-                case eNumber::MUSIC_HYPER_LEVEL:     opEx.push_back(dst_option::SELECT_HAVE_HYPER_IN_SAME_FOLDER);    break;
-                case eNumber::MUSIC_ANOTHER_LEVEL:   opEx.push_back(dst_option::SELECT_HAVE_ANOTHER_IN_SAME_FOLDER);  break;
-                case eNumber::MUSIC_INSANE_LEVEL:    opEx.push_back(dst_option::SELECT_HAVE_INSANE_IN_SAME_FOLDER);   break;
+                case IndexNumber::MUSIC_BEGINNER_LEVEL:  opEx.push_back(dst_option::SELECT_HAVE_BEGINNER_IN_SAME_FOLDER); break;
+                case IndexNumber::MUSIC_NORMAL_LEVEL:    opEx.push_back(dst_option::SELECT_HAVE_NORMAL_IN_SAME_FOLDER);   break;
+                case IndexNumber::MUSIC_HYPER_LEVEL:     opEx.push_back(dst_option::SELECT_HAVE_HYPER_IN_SAME_FOLDER);    break;
+                case IndexNumber::MUSIC_ANOTHER_LEVEL:   opEx.push_back(dst_option::SELECT_HAVE_ANOTHER_IN_SAME_FOLDER);  break;
+                case IndexNumber::MUSIC_INSANE_LEVEL:    opEx.push_back(dst_option::SELECT_HAVE_INSANE_IN_SAME_FOLDER);   break;
                 }
             }
             drawQueue.push_back({ e, dst_option(d.op[0]), dst_option(d.op[1]), dst_option(d.op[2]), dst_option(d.op[3]), opEx });
 
             e->setLoopTime(d.loop);
-            e->setTrigTimer((eTimer)d.timer);
+            e->setTrigTimer((IndexTimer)d.timer);
         }
 
         if (type == DefType::GAUGECHART_1P || type == DefType::GAUGECHART_2P)
@@ -2053,7 +2403,7 @@ bool SkinLR2::DST()
         }
 
         e->appendKeyFrame({ d.time, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-            (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+            lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
         //e->pushKeyFrame(time, x, y, w, h, acc, r, g, b, a, blend, filter, angle, center);
         //LOG_DEBUG << "[Skin] " << raw << ": Set sprite Keyframe (time: " << d.time << ")";
 
@@ -2072,38 +2422,46 @@ ParseRet SkinLR2::DST_NOTE()
 
     // load raw into data struct
     lr2skin::dst d(parseParamBuf);
+    if (lr2skin::flipSideFlag)
+    {
+        if (0 <= d._null && d._null <= 9) d._null += 10;
+        else if (10 <= d._null && d._null <= 19) d._null -= 10;
+    }
 
     if (d._null >= 20)
     {
         return ParseRet::PARAM_INVALID;
     }
 
-    NoteLaneIndex idx = NoteLaneIndex(NoteIdxToLaneMap[d._null]);
+    NoteLaneIndex idx = NoteIdxToLane(info.mode, d._null);
 
     auto setDstNoteSprite = [&](NoteLaneCategory i, std::shared_ptr<SpriteLaneVertical> e)
     {
         /*
         e->pNote->clearKeyFrames();
         e->pNote->appendKeyFrame({ 0, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-            (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center)  } });
+            lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center)  } });
             */
         
         drawQueue.push_back({ e, dst_option(d.op[0]), dst_option(d.op[1]), dst_option(d.op[2]), dst_option(d.op[3]), {} });
         e->appendKeyFrame({ 0, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-            (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+            lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
         e->setLoopTime(0);
         //e->pushKeyFrame(time, x, y, w, h, acc, r, g, b, a, blend, filter, angle, center);
         //LOG_DEBUG << "[Skin] " << raw << ": Set Lane sprite Keyframe (time: " << d.time << ")";
     };
 
-    auto e1 = _laneSprites[channelToIdx(NoteLaneCategory::Note, idx)];
+    auto& [e1, e1a] = _laneSprites[channelToIdx(NoteLaneCategory::Note, idx)];
     if (e1) setDstNoteSprite(NoteLaneCategory::Note, e1);
+    if (e1a) setDstNoteSprite(NoteLaneCategory::Note, e1a);
 
-    auto e2 = _laneSprites[channelToIdx(NoteLaneCategory::Mine, idx)];
+    auto& [e2, e2a] = _laneSprites[channelToIdx(NoteLaneCategory::Mine, idx)];
     if (e2) setDstNoteSprite(NoteLaneCategory::Mine, e2);
+    if (e2a) setDstNoteSprite(NoteLaneCategory::Mine, e2a);
 
-    auto e3 = _laneSprites[channelToIdx(NoteLaneCategory::LN, idx)];
+    auto& [e3, e3a] = _laneSprites[channelToIdx(NoteLaneCategory::LN, idx)];
     if (e3) setDstNoteSprite(NoteLaneCategory::LN, e3);
+    if (e3a) setDstNoteSprite(NoteLaneCategory::LN, e3a);
 
     return ParseRet::OK;
 }
@@ -2138,8 +2496,7 @@ ParseRet SkinLR2::DST_LINE()
     // set sprite channel
     auto p = std::static_pointer_cast<SpriteLaneVertical>(e);
 
-    chart::NoteLaneCategory cat = p->getLaneCat();
-    chart::NoteLaneIndex idx = p->getLaneIdx();
+    auto& [cat, idx] = p->getLane();
     if (cat != chart::NoteLaneCategory::EXTRA || (idx != chart::EXTRA_BARLINE_1P && idx != chart::EXTRA_BARLINE_2P))
     {
         LOG_WARNING << "[Skin] " << csvLineNumber << ": Previous SRC definition is not LINE " <<
@@ -2149,11 +2506,11 @@ ParseRet SkinLR2::DST_LINE()
 
     p->pNote->clearKeyFrames();
     p->pNote->appendKeyFrame({ 0, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-        (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+        lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
 
     drawQueue.push_back({ e, dst_option(d.op[0]), dst_option(d.op[1]), dst_option(d.op[2]), dst_option(d.op[3]), {} });
     e->appendKeyFrame({ 0, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-        (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+        lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
     e->setLoopTime(0);
     //e->pushKeyFrame(time, x, y, w, h, acc, r, g, b, a, blend, filter, angle, center);
     //LOG_DEBUG << "[Skin] " << raw << ": Set Lane sprite (Barline) Keyframe (time: " << d.time << ")";
@@ -2177,6 +2534,9 @@ ParseRet SkinLR2::DST_BAR_BODY()
 
     // load raw into data struct
     lr2skin::dst d(parseParamBuf);
+
+    // timers are ignored for bars
+    d.timer = 0;
     
     unsigned idx = unsigned(d._null);
 
@@ -2193,7 +2553,7 @@ ParseRet SkinLR2::DST_BAR_BODY()
         {
             e->setSrcLine(csvLineNumber);
             e->setLoopTime(d.loop);
-            e->setTrigTimer((eTimer)d.timer);
+            e->setTrigTimer((IndexTimer)d.timer);
 
             if (!_barSpriteAdded[idx])
             {
@@ -2204,7 +2564,7 @@ ParseRet SkinLR2::DST_BAR_BODY()
         }
 
         e->appendKeyFrame({ d.time, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-            (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+            lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
     }
 
     _barSprites[idx]->pushPartsOrder(bodyOn ? BarPartsType::BODY_ON : BarPartsType::BODY_OFF);
@@ -2216,6 +2576,9 @@ ParseRet SkinLR2::DST_BAR_FLASH()
 {
     // load raw into data struct
     lr2skin::dst d(parseParamBuf);
+
+    // timers are ignored for bars
+    d.timer = 0;
 
     for (auto& bar : _barSprites)
     {
@@ -2230,11 +2593,11 @@ ParseRet SkinLR2::DST_BAR_FLASH()
         {
             e->setSrcLine(csvLineNumber);
             e->setLoopTime(d.loop);
-            e->setTrigTimer((eTimer)d.timer);
+            e->setTrigTimer((IndexTimer)d.timer);
         }
 
         e->appendKeyFrame({ d.time, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-            (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+            lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
 
         bar->pushPartsOrder(BarPartsType::FLASH);
     }
@@ -2246,6 +2609,9 @@ ParseRet SkinLR2::DST_BAR_LEVEL()
 {
     // load raw into data struct
     lr2skin::dst d(parseParamBuf);
+
+    // timers are ignored for bars
+    d.timer = 0;
     
     BarLevelType type = BarLevelType(d._null);
 
@@ -2262,11 +2628,11 @@ ParseRet SkinLR2::DST_BAR_LEVEL()
         {
             e->setSrcLine(csvLineNumber);
             e->setLoopTime(d.loop);
-            e->setTrigTimer((eTimer)d.timer);
+            e->setTrigTimer((IndexTimer)d.timer);
         }
 
         e->appendKeyFrame({ d.time, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-            (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+            lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
 
         bar->pushPartsOrder(BarPartsType::LEVEL);
     }
@@ -2279,6 +2645,9 @@ ParseRet SkinLR2::DST_BAR_RIVAL_MYLAMP()
 {
     // load raw into data struct
     lr2skin::dst d(parseParamBuf);
+
+    // timers are ignored for bars
+    d.timer = 0;
     
     auto type = BarLampType(d._null);
 
@@ -2295,11 +2664,11 @@ ParseRet SkinLR2::DST_BAR_RIVAL_MYLAMP()
         {
             e->setSrcLine(csvLineNumber);
             e->setLoopTime(d.loop);
-            e->setTrigTimer((eTimer)d.timer);
+            e->setTrigTimer((IndexTimer)d.timer);
         }
 
         e->appendKeyFrame({ d.time, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-            (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+            lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
 
         bar->pushPartsOrder(BarPartsType::MYLAMP);
     }
@@ -2310,6 +2679,9 @@ ParseRet SkinLR2::DST_BAR_RIVAL_RIVALLAMP()
 {
     // load raw into data struct
     lr2skin::dst d(parseParamBuf);
+
+    // timers are ignored for bars
+    d.timer = 0;
     
     auto type = BarLampType(d._null);
 
@@ -2326,11 +2698,11 @@ ParseRet SkinLR2::DST_BAR_RIVAL_RIVALLAMP()
         {
             e->setSrcLine(csvLineNumber);
             e->setLoopTime(d.loop);
-            e->setTrigTimer((eTimer)d.timer);
+            e->setTrigTimer((IndexTimer)d.timer);
         }
 
         e->appendKeyFrame({ d.time, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-            (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+            lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
 
         bar->pushPartsOrder(BarPartsType::RIVALLAMP);
     }
@@ -2342,6 +2714,9 @@ ParseRet SkinLR2::DST_BAR_LAMP()
 {
     // load raw into data struct
     lr2skin::dst d(parseParamBuf);
+
+    // timers are ignored for bars
+    d.timer = 0;
     
     auto type = BarLampType(d._null);
 
@@ -2358,11 +2733,11 @@ ParseRet SkinLR2::DST_BAR_LAMP()
         {
             e->setSrcLine(csvLineNumber);
             e->setLoopTime(d.loop);
-            e->setTrigTimer((eTimer)d.timer);
+            e->setTrigTimer((IndexTimer)d.timer);
         }
 
         e->appendKeyFrame({ d.time, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-            (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+            lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
 
         bar->pushPartsOrder(BarPartsType::LAMP);
     }
@@ -2374,6 +2749,9 @@ ParseRet SkinLR2::DST_BAR_TITLE()
 {
     // load raw into data struct
     lr2skin::dst d(parseParamBuf);
+
+    // timers are ignored for bars
+    d.timer = 0;
 
     auto type = BarTitleType(d._null);
 
@@ -2390,11 +2768,11 @@ ParseRet SkinLR2::DST_BAR_TITLE()
         {
             e->setSrcLine(csvLineNumber);
             e->setLoopTime(d.loop);
-            e->setTrigTimer((eTimer)d.timer);
+            e->setTrigTimer((IndexTimer)d.timer);
         }
 
         e->appendKeyFrame({ d.time, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-            (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+            lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
 
         bar->pushPartsOrder(BarPartsType::TITLE);
     }
@@ -2406,6 +2784,9 @@ ParseRet SkinLR2::DST_BAR_RANK()
 {
     // load raw into data struct
     lr2skin::dst d(parseParamBuf);
+
+    // timers are ignored for bars
+    d.timer = 0;
 
     auto type = BarRankType(d._null);
 
@@ -2422,11 +2803,11 @@ ParseRet SkinLR2::DST_BAR_RANK()
         {
             e->setSrcLine(csvLineNumber);
             e->setLoopTime(d.loop);
-            e->setTrigTimer((eTimer)d.timer);
+            e->setTrigTimer((IndexTimer)d.timer);
         }
 
         e->appendKeyFrame({ d.time, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-            (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+            lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
 
         bar->pushPartsOrder(BarPartsType::RANK);
     }
@@ -2438,6 +2819,9 @@ ParseRet SkinLR2::DST_BAR_RIVAL()
 {
     // load raw into data struct
     lr2skin::dst d(parseParamBuf);
+
+    // timers are ignored for bars
+    d.timer = 0;
     
     auto type = BarRivalType(d._null);
 
@@ -2454,11 +2838,11 @@ ParseRet SkinLR2::DST_BAR_RIVAL()
         {
             e->setSrcLine(csvLineNumber);
             e->setLoopTime(d.loop);
-            e->setTrigTimer((eTimer)d.timer);
+            e->setTrigTimer((IndexTimer)d.timer);
         }
 
         e->appendKeyFrame({ d.time, {Rect(d.x, d.y, d.w, d.h), (RenderParams::accTy)d.acc, Color(d.r, d.g, d.b, d.a),
-            (BlendMode)d.blend, !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
+            lr2skin::convertBlend(d.blend), !!d.filter, (double)d.angle, getCenterPoint(d.w, d.h, d.center) } });
 
         bar->pushPartsOrder(BarPartsType::RIVAL);
     }
@@ -2504,17 +2888,12 @@ int SkinLR2::parseHeader(const Tokens& raw)
         case 8:		info.mode = eMode::KEY_CONFIG;	break;
         case 9:		info.mode = eMode::THEME_SELECT;	break;
         case 10:	info.mode = eMode::SOUNDSET;	break;
-        case 12:	info.mode = eMode::PLAY5_2;	break;
-        case 13:	info.mode = eMode::PLAY7_2;	break;
+        case 12:	info.mode = eMode::PLAY7_2;	break;
+        case 13:	info.mode = eMode::PLAY5_2;	break;
+        case 14:	info.mode = eMode::PLAY9_2;	break;
         case 15:	info.mode = eMode::COURSE_RESULT;	break;
 
         case 17:	info.mode = eMode::TITLE;	break;
-        case 16:	info.mode = eMode::PLAY9_2;	break;
-            // 11: THEME
-            // 14: COURSE EDIT
-            // 18: MODE SELECT
-            // 19: MODE DECIDE
-            // 20: COURSE SELECT
         }
         info.name = title;
         info.maker = maker;
@@ -2593,11 +2972,16 @@ int SkinLR2::parseHeader(const Tokens& raw)
         for (auto& p : ls)
         {
             c.label.push_back(p.filename().stem().u8string());
+            c.pathList.push_back(p);
         }
-        c.pathList = std::move(ls);
+        c.label.push_back("RANDOM");
+        c.pathList.push_back("RANDOM");
         c.defIdx = defVal;
         c.value = defVal;
         customize.push_back(c);
+
+        std::srand(std::time(NULL));
+        customizeRandom[customize.size() - 1] = ls.empty() ? 0 : (std::rand() % ls.size());
 
         return 3;
     }
@@ -2650,15 +3034,41 @@ int SkinLR2::parseBody(const Tokens &raw)
     return 0;
 }
 
-void SkinLR2::IF(const Tokens &t, std::istream& lr2skin, eFileEncoding enc)
+void SkinLR2::IF(const Tokens &t, std::istream& lr2skin, eFileEncoding enc, bool ifUnsatisfied, bool skipOnly)
 {
-    bool isElseStmt = false;
-    bool ifStmtTrue = true;
-    if (strEqual(t[0], "#ELSE", true))
+    if (skipOnly)
     {
-        isElseStmt = true;
+        // only look for #ENDIF, skip the whole sub #IF block
+        while (!lr2skin.eof())
+        {
+            std::string raw;
+            std::getline(lr2skin, raw);
+            ++csvLineNumber;
+
+            std::string rawUTF8 = to_utf8(raw, enc);
+
+            auto tokens = csvLineTokenize(rawUTF8);
+            if (tokens.empty()) continue;
+
+            if (strEqual(*tokens.begin(), "#IF", true))
+            {
+                // nesting #IF
+                IF(tokens, lr2skin, enc, false, true);
+            }
+            else if (strEqual(*tokens.begin(), "#ENDIF", true))
+            {
+                // end #IF process
+                return;
+            }
+        }
     }
-    else 
+
+    bool ifStmtTrue = false;
+    if (ifUnsatisfied && strEqual(t[0], "#ELSE", true))
+    {
+        ifStmtTrue = true;
+    }
+    else
     {
         if (t.size() <= 1)
         {
@@ -2666,6 +3076,7 @@ void SkinLR2::IF(const Tokens &t, std::istream& lr2skin, eFileEncoding enc)
         }
 
         // get dst indexes
+        ifStmtTrue = true;
         for (auto it = ++t.begin(); it != t.end() && ifStmtTrue; ++it)
         {
             if (it->empty()) continue;
@@ -2697,19 +3108,46 @@ void SkinLR2::IF(const Tokens &t, std::istream& lr2skin, eFileEncoding enc)
             auto tokens = csvLineTokenize(rawUTF8);
             if (tokens.empty()) continue;
 
-            if (strEqual(*tokens.begin(), "#ENDIF", true))
-            {
-                // end #IF process
-                return;
-            }
-            else if (isElseStmt || strEqual(*tokens.begin(), "#ELSEIF", true) || strEqual(*tokens.begin(), "#ELSE", true))
-            {
-                ifBlockEnded = true;
-            }
-            else if (!ifBlockEnded)
+            if (!ifBlockEnded)
             {
                 // parse current branch
-                parseBody(tokens);
+                if (strEqual(*tokens.begin(), "#ELSEIF", true) || strEqual(*tokens.begin(), "#ELSE", true))
+                {
+                    IF(tokens, lr2skin, enc, false, true);
+                    break;
+                }
+                else if (strEqual(*tokens.begin(), "#IF", true))
+                {
+                    // nesting #IF
+                    IF(tokens, lr2skin, enc, false, false);
+                }
+                else if (strEqual(*tokens.begin(), "#ENDIF", true))
+                {
+                    // end #IF process
+                    return;
+                }
+                else
+                {
+                    parseBody(tokens);
+                }
+            }
+            else
+            {
+                if (strEqual(*tokens.begin(), "#IF", true))
+                {
+                    // nesting #IF
+                    IF(tokens, lr2skin, enc, false, true);
+                }
+                else if (strEqual(*tokens.begin(), "#ELSEIF", true) || strEqual(*tokens.begin(), "#ELSE", true))
+                {
+                    IF(tokens, lr2skin, enc, false, true);
+                    break;
+                }
+                else if (strEqual(*tokens.begin(), "#ENDIF", true))
+                {
+                    // end #IF process
+                    return;
+                }
             }
         }
     }
@@ -2723,18 +3161,25 @@ void SkinLR2::IF(const Tokens &t, std::istream& lr2skin, eFileEncoding enc)
             auto tokens = csvLineTokenize(raw);
             if (tokens.empty()) continue;
 
-            if (strEqual(*tokens.begin(), "#ELSE", true))
+            if (strEqual(*tokens.begin(), "#IF", true))
             {
-                IF(tokens, lr2skin, enc);
+                // nesting #IF
+                IF(tokens, lr2skin, enc, false, true);
+            }
+            else if (strEqual(*tokens.begin(), "#ELSE", true))
+            {
+                IF(tokens, lr2skin, enc, true, false);
                 return;
             }
             else if (strEqual(*tokens.begin(), "#ELSEIF", true))
             {
-                IF(tokens, lr2skin, enc);
+                IF(tokens, lr2skin, enc, true, false);
                 return;
             }
             else if (strEqual(*tokens.begin(), "#ENDIF", true))
+            {
                 return;
+            }
         }
     }
 }
@@ -2743,7 +3188,7 @@ void SkinLR2::IF(const Tokens &t, std::istream& lr2skin, eFileEncoding enc)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-SkinLR2::SkinLR2(Path p, bool headerOnly)
+SkinLR2::SkinLR2(Path p, int loadMode): loadMode(loadMode)
 {
     _type = eSkinType::LR2;
 
@@ -2753,8 +3198,29 @@ SkinLR2::SkinLR2(Path p, bool headerOnly)
         _sprites.push_back(_barSprites[i]);
     }
     _laneSprites.resize(chart::LANE_COUNT);
+
+    // re-reference previously loaded #IMAGE
+    _textureNameMap.insert(LR2SkinImageCache.begin(), LR2SkinImageCache.end());
+
+    switch (info.mode)
+    {
+    case eMode::PLAY5:
+    case eMode::PLAY5_2:
+    case eMode::PLAY7:
+    case eMode::PLAY7_2:
+    case eMode::PLAY9:
+    case eMode::PLAY10:
+    case eMode::PLAY14:
+        flipResult = false;
+        break;
+    }
+
     updateDstOpt();
-    loadCSV(p, headerOnly);
+    loadCSV(p);
+    postLoad();
+
+    LOG_DEBUG << "[Skin] File: " << p.u8string() << "(Line " << csvLineNumber << "): Body loading finished";
+    _loaded = true;
 
     startSpriteVideoPlayback();
 }
@@ -2764,7 +3230,7 @@ SkinLR2::~SkinLR2()
     stopSpriteVideoPlayback();
 }
 
-void SkinLR2::loadCSV(Path p, bool headerOnly)
+void SkinLR2::loadCSV(Path p)
 {
     if (filePath.empty())
         filePath = p;
@@ -2814,7 +3280,7 @@ void SkinLR2::loadCSV(Path p, bool headerOnly)
     }
     LOG_DEBUG << "[Skin] File: " << p.u8string() << "(Line " << csvLineNumber << "): Header loading finished";
 
-    if (!headerOnly)
+    if (loadMode < 2)
     {
         if (!haveEndOfHeader && csvFile.eof())
         {
@@ -2898,31 +3364,52 @@ void SkinLR2::loadCSV(Path p, bool headerOnly)
             if (tokens.empty()) continue;
 
             if (strEqual(*tokens.begin(), "#IF", true))
+            {
                 IF(tokens, csvFile, encoding);
+            }
+            else if (strEqual(*tokens.begin(), "#ELSE", true))
+            {
+                LOG_WARNING << "[Skin] Unexcepted #ELSE found without precedent #IF " << "(Line " << csvLineNumber << ")";
+            }
+            else if (strEqual(*tokens.begin(), "#ELSEIF", true))
+            {
+                LOG_WARNING << "[Skin] Unexcepted #ELSEIF found without precedent #IF " << "(Line " << csvLineNumber << ")";
+            }
+            else if (strEqual(*tokens.begin(), "#ENDIF", true))
+            {
+                LOG_WARNING << "[Skin] Unexcepted #ENDIF found without precedent #IF " << "(Line " << csvLineNumber << ")";
+            }
             else
+            {
                 parseBody(tokens);
-        }
-
-        // set barcenter
-        if (barCenter < _barSprites.size())
-        {
-            _barSprites[barCenter]->drawFlash = true;
-
-            if (gResetSelectCursor)
-            {
-                gResetSelectCursor = false;
-                gSelectContext.cursor = barCenter;
             }
         }
+    }
 
-        // set note area height
-        for (auto& s : _sprites)
+    csvLineNumber = srcLineNumberParent;
+}
+
+void SkinLR2::postLoad()
+{
+    // set barcenter
+    if (barCenter < _barSprites.size())
+    {
+        _barSprites[barCenter]->drawFlash = true;
+
+        if (gResetSelectCursor)
         {
-            auto pS = std::dynamic_pointer_cast<SpriteLaneVertical>(s);
-            if (pS != nullptr)
-            {
-                pS->setHeight(500);
-            }
+            gResetSelectCursor = false;
+            gSelectContext.cursor = barCenter;
+        }
+    }
+
+    // set note area height
+    for (auto& s : _sprites)
+    {
+        auto pS = std::dynamic_pointer_cast<SpriteLaneVertical>(s);
+        if (pS != nullptr)
+        {
+            pS->setHeight(500);
         }
     }
 
@@ -2931,24 +3418,27 @@ void SkinLR2::loadCSV(Path p, bool headerOnly)
         using namespace chart;
         for (size_t i = begin; i <= end; ++i)
         {
-            NoteLaneIndex lane = NoteLaneIndex(NoteIdxToLaneMap[i]);
+            NoteLaneIndex lane = NoteIdxToLane(info.mode, i);
             if (lane == _) continue;
             size_t idx;
 
             idx = channelToIdx(NoteLaneCategory::Note, lane);
-            if (idx != LANE_INVALID && _laneSprites[idx] != nullptr)
+            if (idx != LANE_INVALID)
             {
-                _laneSprites[idx]->setHeight(height);
+                if (_laneSprites[idx].first != nullptr) _laneSprites[idx].first->setHeight(height);
+                if (_laneSprites[idx].second != nullptr) _laneSprites[idx].second->setHeight(height);
             }
             idx = channelToIdx(NoteLaneCategory::Mine, lane);
-            if (idx != LANE_INVALID && _laneSprites[idx] != nullptr)
+            if (idx != LANE_INVALID)
             {
-                _laneSprites[idx]->setHeight(height);
+                if (_laneSprites[idx].first != nullptr) _laneSprites[idx].first->setHeight(height);
+                if (_laneSprites[idx].second != nullptr) _laneSprites[idx].second->setHeight(height);
             }
             idx = channelToIdx(NoteLaneCategory::LN, lane);
-            if (idx != LANE_INVALID && _laneSprites[idx] != nullptr)
+            if (idx != LANE_INVALID)
             {
-                _laneSprites[idx]->setHeight(height);
+                if (_laneSprites[idx].first != nullptr) _laneSprites[idx].first->setHeight(height);
+                if (_laneSprites[idx].second != nullptr) _laneSprites[idx].second->setHeight(height);
             }
         }
     };
@@ -2958,9 +3448,10 @@ void SkinLR2::loadCSV(Path p, bool headerOnly)
         setLaneHeight(0, 9, info.noteLaneHeight1P);
 
         constexpr size_t idx = channelToIdx(NoteLaneCategory::EXTRA, NoteLaneExtra::EXTRA_BARLINE_1P);
-        if (idx != LANE_INVALID && _laneSprites[idx] != nullptr)
+        if (idx != LANE_INVALID)
         {
-            _laneSprites[idx]->setHeight(info.noteLaneHeight1P);
+            if (_laneSprites[idx].first != nullptr) _laneSprites[idx].first->setHeight(info.noteLaneHeight1P);
+            if (_laneSprites[idx].second != nullptr) _laneSprites[idx].second->setHeight(info.noteLaneHeight1P);
         }
     }
     if (info.noteLaneHeight2P != 0)
@@ -2969,30 +3460,171 @@ void SkinLR2::loadCSV(Path p, bool headerOnly)
         setLaneHeight(10, 19, info.noteLaneHeight2P);
 
         constexpr size_t idx = channelToIdx(NoteLaneCategory::EXTRA, NoteLaneExtra::EXTRA_BARLINE_2P);
-        if (idx != LANE_INVALID && _laneSprites[idx] != nullptr)
+        if (idx != LANE_INVALID)
         {
-            _laneSprites[idx]->setHeight(info.noteLaneHeight2P);
+            if (_laneSprites[idx].first != nullptr) _laneSprites[idx].first->setHeight(info.noteLaneHeight2P);
+            if (_laneSprites[idx].second != nullptr) _laneSprites[idx].second->setHeight(info.noteLaneHeight2P);
         }
     }
 
-    LOG_DEBUG << "[Skin] File: " << p.u8string() << "(Line " << csvLineNumber << "): Body loading finished";
-    _loaded = true;
-
-    /*
-    loadImages();
-    convertImageToTexture();
-    for (auto& e : elements)
+    if (!isSupportLift)
     {
-        if (e && e->type() != elementType::TEXT)
+        using namespace chart;
+        size_t idx;
+        for (size_t i = 0; i < 20; ++i)
         {
-            createSprite(*e);
+            NoteLaneIndex lane = NoteIdxToLane(info.mode, i);
+            if (lane == _) continue;
+
+            idx = channelToIdx(NoteLaneCategory::Note, lane);
+            if (idx != LANE_INVALID)
+            {
+                if (_laneSprites[idx].first != nullptr) _laneSprites[idx].first->setHIDDENCompatible();
+                if (_laneSprites[idx].second != nullptr) _laneSprites[idx].second->setHIDDENCompatible();
+            }
+            idx = channelToIdx(NoteLaneCategory::Mine, lane);
+            if (idx != LANE_INVALID)
+            {
+                if (_laneSprites[idx].first != nullptr) _laneSprites[idx].first->setHIDDENCompatible();
+                if (_laneSprites[idx].second != nullptr) _laneSprites[idx].second->setHIDDENCompatible();
+            }
+            idx = channelToIdx(NoteLaneCategory::LN, lane);
+            if (idx != LANE_INVALID)
+            {
+                if (_laneSprites[idx].first != nullptr) _laneSprites[idx].first->setHIDDENCompatible();
+                if (_laneSprites[idx].second != nullptr) _laneSprites[idx].second->setHIDDENCompatible();
+            }
+        }
+        idx = channelToIdx(NoteLaneCategory::EXTRA, NoteLaneExtra::EXTRA_BARLINE_1P);
+        if (idx != LANE_INVALID)
+        {
+            if (_laneSprites[idx].first != nullptr) _laneSprites[idx].first->setHIDDENCompatible();
+            if (_laneSprites[idx].second != nullptr) _laneSprites[idx].second->setHIDDENCompatible();
+        }
+        idx = channelToIdx(NoteLaneCategory::EXTRA, NoteLaneExtra::EXTRA_BARLINE_2P);
+        if (idx != LANE_INVALID)
+        {
+            if (_laneSprites[idx].first != nullptr) _laneSprites[idx].first->setHIDDENCompatible();
+            if (_laneSprites[idx].second != nullptr) _laneSprites[idx].second->setHIDDENCompatible();
         }
     }
-    */
 
-    csvLineNumber = srcLineNumberParent;
+    // LIFT:
+    // the following conditions are based on black box testing on LR2
+    // 
+    // SRC_IMAGE:
+    //  JUDGELINE.x - 5  <= x <= JUDGELINE.x + 5
+    //  JUDGELINE.w - 10 <= w <= JUDGELINE.w + 10
+    //  y <= JUDGELINE.y
+    //
+    // SRC_IMAGE with bomb timers:
+    //  did not found any obvious conditions
+    // 
+    // SRC_IMAGE with key input timers:
+    //  h >= 100
+    //
+    // the following conditions are added by Lunatic Vibes
+    // 
+    // SRC_NUMBER0:
+    // num=108/128 (target score): timer=40/46, y <= JUDGELINE.y
+    // num=210/211 (F/S): timer=40/46, y <= JUDGELINE.y
+    // num=310-315 (3col)
+    for (auto& e : drawQueue)
+    {
+        auto& s = e.ps;
+        if (s->isKeyFrameEmpty()) continue;
+        if (s->type() == SpriteTypes::ANIMATED)
+        {
+            const Rect& rcFirst = s->_keyFrames.front().param.rect;
+            const Rect& rcLast = s->_keyFrames.back().param.rect;
+            int timer = (int)s->_triggerTimer;
+            if (timer >= 100 && timer <= 109 || timer >= 120 && timer <= 129 ||
+                timer >= 50 && timer <= 59 || timer >= 70 && timer <= 79 ||
+                timer == (int)IndexTimer::S1L_DOWN || timer == (int)IndexTimer::S1L_UP || timer == (int)IndexTimer::S1R_DOWN || timer == (int)IndexTimer::S1R_UP)
+            {
+                if (rcFirst.h <= -100 || rcFirst.h >= 100 || rcLast.h <= -100 || rcLast.h >= 100)
+                    spritesMoveWithLift1P.push_back(s);
+            }
+            else if (timer >= 110 && timer <= 119 || timer >= 130 && timer <= 139 ||
+                timer >= 60 && timer <= 69 || timer >= 80 && timer <= 89 ||
+                timer == (int)IndexTimer::S2L_DOWN || timer == (int)IndexTimer::S2L_UP || timer == (int)IndexTimer::S2R_DOWN || timer == (int)IndexTimer::S2R_UP)
+            {
+                if (rcFirst.h <= -100 || rcFirst.h >= 100 || rcLast.h <= -100 || rcLast.h >= 100)
+                    spritesMoveWithLift2P.push_back(s);
+            }
+            else if (judgeLineRect1P.x - 5 <= rcFirst.x && rcFirst.x <= judgeLineRect1P.x + 5 &&
+                judgeLineRect1P.w - 10 <= rcFirst.w && rcFirst.w <= judgeLineRect1P.w + 10 &&
+                rcFirst.y <= judgeLineRect1P.y)
+            {
+                spritesMoveWithLift1P.push_back(s);
+            }
+            else if (judgeLineRect2P.x - 5 <= rcFirst.x && rcFirst.x <= judgeLineRect2P.x + 5 &&
+                judgeLineRect2P.w - 10 <= rcFirst.w && rcFirst.w <= judgeLineRect2P.w + 10 &&
+                rcFirst.y <= judgeLineRect2P.y)
+            {
+                spritesMoveWithLift2P.push_back(s);
+            }
+        }
+        else if (s->type() == SpriteTypes::NUMBER)
+        {
+            const Rect& rcFirst = s->_keyFrames.front().param.rect;
+            const Rect& rcLast = s->_keyFrames.back().param.rect;
+            int num = (int)std::dynamic_pointer_cast<SpriteNumber>(s)->_numInd;
+            int timer = (int)s->_triggerTimer;
+            if (timer == 40 || timer == 46)
+            {
+                if (rcFirst.y <= judgeLineRect1P.y || rcLast.y <= judgeLineRect1P.y)
+                {
+                    if (num == 108 || num == 210)
+                    {
+                        spritesMoveWithLift1P.push_back(s);
+                    }
+                }
+                else if (rcFirst.y <= judgeLineRect2P.y || rcLast.y <= judgeLineRect2P.y)
+                {
+                    if (num == 128 || num == 211)
+                    {
+                        spritesMoveWithLift2P.push_back(s);
+                    }
+                }
+            }
+            else if (num >= 310 && num <= 315)
+            {
+                spritesMoveWithLift1P.push_back(s);
+            }
+        }
+    }
+
 }
 
+void SkinLR2::findAndExtractDXA(const Path& path)
+{
+    if (!fs::is_regular_file(path))
+    {
+        std::string archiveName;
+        Path lr2skinFolder = fs::absolute(filePath).parent_path();
+        auto lr2skinFolderStr = lr2skinFolder.native();
+        Path folder = path.parent_path();
+        Path::string_type folderStr;
+        do
+        {
+            archiveName = folder.stem().u8string() + ".dxa";
+            folder = folder.parent_path();
+            folderStr = fs::absolute(folder).native();
+
+            // find dxa file
+            Path dxa = folder / PathFromUTF8(archiveName);
+
+            // extract dxa
+            if (std::filesystem::is_regular_file(dxa))
+            {
+                LOG_DEBUG << "[Skin] Extract dxa file: " << fs::absolute(dxa).u8string();
+                extractDxaToFile(dxa);
+                break;
+            }
+        } while (folderStr.length() >= lr2skinFolderStr.length() && folderStr.substr(0, lr2skinFolderStr.length()) == lr2skinFolderStr);
+    }
+}
 
 //////////////////////////////////////////////////
 
@@ -3008,8 +3640,8 @@ void SkinLR2::update()
 
     // update turntables
     {
-        int ttAngle1P = gNumbers.get(eNumber::_ANGLE_TT_1P);
-        int ttAngle2P = gNumbers.get(eNumber::_ANGLE_TT_2P);
+        int ttAngle1P = State::get(IndexNumber::_ANGLE_TT_1P);
+        int ttAngle2P = State::get(IndexNumber::_ANGLE_TT_2P);
 
 #ifndef _DEBUG
         std::for_each(std::execution::par_unseq, drawQueue.begin(), drawQueue.end(), [ttAngle1P, ttAngle2P](auto& e)
@@ -3043,26 +3675,39 @@ void SkinLR2::update()
     // 18-23: NOWCOMBO 2P
     for (size_t i = 0; i < 6; ++i)
     {
-        if (gSprites[i] && gSprites[i + 6] && gSprites[i]->_draw && gSprites[i + 6]->_draw)
+        // 1P judge
+        if (gSprites[i] && gSprites[i + 6] && gSprites[i]->isDraw() && gSprites[i + 6]->isDraw())
         {
             std::shared_ptr<SpriteAnimated> judge = std::reinterpret_pointer_cast<SpriteAnimated>(gSprites[i]);
             std::shared_ptr<SpriteNumber> combo = std::reinterpret_pointer_cast<SpriteNumber>(gSprites[i + 6]);
-            if (judge->isDraw())
+            if (judge->isDraw() && !judge->isHidden())
             {
                 combo->setHide(false);
 
-                Rect diff{ 0,0,0,0 };
-                //diff.x = int(std::floor(0.5 * combo->_current.rect.w * combo->_numDigits));
-                diff.x += judge->_current.rect.x;
-                diff.y += judge->_current.rect.y;
-                if (!noshiftJudge1P[i])
-                {
-                    judge->_current.rect.x -= int(std::floor(0.5 * combo->_current.rect.w * combo->_numDigits));
-                }
+                Rect base = judge->_current.rect;
+                double shiftUnit = 0.5 * combo->_current.rect.w;
+
+                int judgeShiftWidth = noshiftJudge1P[i] ? 0 : int(std::floor(shiftUnit * combo->_numDigits));
+                judge->_current.rect.x -= judgeShiftWidth;
+
                 for (auto& d : combo->_rects)
                 {
-                    d.x += diff.x;
-                    d.y += diff.y;
+                    int comboShiftUnitCount = noshiftJudge1P[i] ? 0 : -1;
+
+                    switch (alignNowCombo1P[i])
+                    {
+                    case 0:
+                        comboShiftUnitCount += (combo->_maxDigits - combo->_numDigits) * 2 - combo->_numDigits + 1;
+                        break;
+                    case 1:
+                        comboShiftUnitCount -= combo->_numDigits - 1;
+                        break;
+                    case 2:
+                        comboShiftUnitCount += (-combo->_maxDigits - 1) + (combo->_maxDigits - combo->_numDigits + 1) * 2;
+                        break;
+                    }
+                    d.x += base.x + int(std::floor(shiftUnit * comboShiftUnitCount));
+                    d.y += base.y;
                 }
             }
             else
@@ -3070,26 +3715,39 @@ void SkinLR2::update()
                 combo->setHide(true);
             }
         }
-        if (gSprites[i + 12] && gSprites[i + 18] && gSprites[i + 12]->_draw && gSprites[i + 18]->_draw)
+        // 2P judge
+        if (gSprites[i + 12] && gSprites[i + 18] && gSprites[i + 12]->isDraw() && gSprites[i + 18]->isDraw())
         {
             std::shared_ptr<SpriteAnimated> judge = std::reinterpret_pointer_cast<SpriteAnimated>(gSprites[i + 12]);
             std::shared_ptr<SpriteNumber> combo = std::reinterpret_pointer_cast<SpriteNumber>(gSprites[i + 18]);
-            if (judge->isDraw())
+            if (judge->isDraw() && !judge->isHidden())
             {
                 combo->setHide(false);
 
-                Rect diff{ 0,0,0,0 };
-                //diff.x = int(std::floor(0.5 * combo->_current.rect.w * combo->_numDigits));
-                diff.x += judge->_current.rect.x;
-                diff.y += judge->_current.rect.y;
-                if (!noshiftJudge2P[i])
-                {
-                    judge->_current.rect.x -= int(std::floor(0.5 * combo->_current.rect.w * combo->_numDigits));
-                }
+                Rect base = judge->_current.rect;
+                double shiftUnit = 0.5 * combo->_current.rect.w;
+
+                int judgeShiftWidth = noshiftJudge2P[i] ? 0 : int(std::floor(shiftUnit * combo->_numDigits));
+                judge->_current.rect.x -= judgeShiftWidth;
+
                 for (auto& d : combo->_rects)
                 {
-                    d.x += diff.x;
-                    d.y += diff.y;
+                    int comboShiftUnitCount = noshiftJudge2P[i] ? 0 : -1;
+
+                    switch (alignNowCombo2P[i])
+                    {
+                    case 0:
+                        comboShiftUnitCount += (combo->_maxDigits - combo->_numDigits) * 2 - combo->_numDigits + 1;
+                        break;
+                    case 1:
+                        comboShiftUnitCount -= combo->_numDigits - 1;
+                        break;
+                    case 2:
+                        comboShiftUnitCount += (-combo->_maxDigits - 1) + (combo->_maxDigits - combo->_numDigits + 1) * 2;
+                        break;
+                    }
+                    d.x += base.x + int(std::floor(shiftUnit * comboShiftUnitCount));
+                    d.y += base.y;
                 }
             }
             else
@@ -3097,6 +3755,96 @@ void SkinLR2::update()
                 combo->setHide(true);
             }
         }
+    }
+
+    // LIFT: move judgeline, nowjudge, nowcombo
+    // 0-5:   NOWJUDGE 1P
+    // 6-11:  NOWCOMBO 1P
+    // 12-17: NOWJUDGE 2P
+    // 18-23: NOWCOMBO 2P
+    // 26: GLOBAL_SPRITE_IDX_1PJUDGELINE
+    // 27: GLOBAL_SPRITE_IDX_2PJUDGELINE
+    int lift1P = 0, lift2P = 0;
+    if (gPlayContext.mods[PLAYER_SLOT_PLAYER].laneEffect == eModLaneEffect::LIFT ||
+        gPlayContext.mods[PLAYER_SLOT_PLAYER].laneEffect == eModLaneEffect::LIFTSUD)
+    {
+        lift1P = (State::get(IndexNumber::LANECOVER_BOTTOM_1P) / 1000.0) * info.noteLaneHeight1P;
+        if (gPlayContext.mode == eMode::PLAY10 || gPlayContext.mode == eMode::PLAY14)
+            lift2P = (State::get(IndexNumber::LANECOVER_BOTTOM_1P) / 1000.0) * info.noteLaneHeight2P;
+    }
+    if (gPlayContext.isBattle && 
+        (gPlayContext.mods[PLAYER_SLOT_TARGET].laneEffect == eModLaneEffect::LIFT ||
+         gPlayContext.mods[PLAYER_SLOT_TARGET].laneEffect == eModLaneEffect::LIFTSUD))
+    {
+        lift2P = (State::get(IndexNumber::LANECOVER_BOTTOM_2P) / 1000.0) * info.noteLaneHeight2P;
+    }
+    gUpdateContext.liftHeight1P = lift1P;
+    gUpdateContext.liftHeight2P = lift2P;
+    if (lift1P > 0)
+    {
+        for (size_t i = 0; i < 6; ++i)
+        {
+            if (gSprites[i])
+            {
+                std::shared_ptr<SpriteAnimated> judge = std::reinterpret_pointer_cast<SpriteAnimated>(gSprites[i]);
+                if (judge->isDraw() && !judge->isHidden())
+                {
+                    judge->moveAfterUpdate(0, -lift1P);
+                }
+            }
+            if (gSprites[i + 6])
+            {
+                std::shared_ptr<SpriteNumber> combo = std::reinterpret_pointer_cast<SpriteNumber>(gSprites[i + 6]);
+                if (combo->isDraw() && !combo->isHidden())
+                {
+                    combo->moveAfterUpdate(0, -lift1P);
+                }
+            }
+        }
+        std::shared_ptr<SpriteAnimated> judgeLine = std::reinterpret_pointer_cast<SpriteAnimated>(gSprites[GLOBAL_SPRITE_IDX_1PJUDGELINE]);
+        if (judgeLine && judgeLine->isDraw() && !judgeLine->isHidden())
+        {
+            judgeLine->moveAfterUpdate(0, -lift1P);
+        }
+    }
+    if (lift2P > 0)
+    {
+        for (size_t i = 0; i < 6; ++i)
+        {
+            if (gSprites[i + 12])
+            {
+                std::shared_ptr<SpriteAnimated> judge = std::reinterpret_pointer_cast<SpriteAnimated>(gSprites[i + 12]);
+                if (judge->isDraw() && !judge->isHidden())
+                {
+                    judge->moveAfterUpdate(0, -lift2P);
+                }
+            }
+            if (gSprites[i + 18])
+            {
+                std::shared_ptr<SpriteNumber> combo = std::reinterpret_pointer_cast<SpriteNumber>(gSprites[i + 18]);
+                if (combo->isDraw() && !combo->isHidden())
+                {
+                    combo->moveAfterUpdate(0, -lift2P);
+                }
+            }
+        }
+        std::shared_ptr<SpriteAnimated> judgeLine = std::reinterpret_pointer_cast<SpriteAnimated>(gSprites[GLOBAL_SPRITE_IDX_2PJUDGELINE]);
+        if (judgeLine && judgeLine->isDraw() && !judgeLine->isHidden())
+        {
+            judgeLine->moveAfterUpdate(0, -lift2P);
+        }
+    }
+
+    // LIFT: sprites
+    if (lift1P > 0)
+    {
+        for (auto& s : spritesMoveWithLift1P)
+            s->moveAfterUpdate(0, -lift1P);
+    }
+    if (lift2P > 0)
+    {
+        for (auto& s : spritesMoveWithLift2P)
+            s->moveAfterUpdate(0, -lift2P);
     }
 
     // update songlist bar
@@ -3112,7 +3860,7 @@ void SkinLR2::update()
             {
                 if (!_barSpriteAdded[i]) continue;
 
-                double posNow = gSliders.get(eSlider::SELECT_LIST) * gSelectContext.entries.size();
+                double posNow = State::get(IndexSlider::SELECT_LIST) * gSelectContext.entries.size();
 
                 double decimal = posNow - (int)posNow;
                 if (decimal <= 0.5 && _barSprites[i - 1]->isDraw())

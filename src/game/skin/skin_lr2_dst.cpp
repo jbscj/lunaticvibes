@@ -1,32 +1,32 @@
 #include "skin_lr2.h"
-#include "game/data/number.h"
+#include "game/scene/scene_context.h"
 
 static std::shared_mutex _mutex;
 static std::bitset<900> _op;
 static std::bitset<100> _customOp;
 std::map<size_t, bool> _extendedOp;
 
-inline bool dst(eOption option_entry, std::initializer_list<unsigned> entries)
+inline bool dst(IndexOption option_entry, std::initializer_list<unsigned> entries)
 {
-	auto op = gOptions.get(option_entry);
+	auto op = State::get(option_entry);
 	for (auto e : entries)
 		if (op == e) return true;
 	return false;
 }
-inline bool dst(eOption option_entry, unsigned entry)
+inline bool dst(IndexOption option_entry, unsigned entry)
 {
-	return gOptions.get(option_entry) == entry;
+	return State::get(option_entry) == entry;
 }
 
-inline bool sw(std::initializer_list<eSwitch> entries)
+inline bool sw(std::initializer_list<IndexSwitch> entries)
 {
 	for (auto e : entries)
-		if (gSwitches.get(e)) return true;
+		if (State::get(e)) return true;
 	return false;
 }
-inline bool sw(eSwitch entry)
+inline bool sw(IndexSwitch entry)
 {
-	return gSwitches.get(entry);
+	return State::get(entry);
 }
 
 inline void set(int idx, bool val = true)
@@ -97,7 +97,7 @@ void updateDstOpt()
 	// 4 選択中バーが新規コース作成
 	// 5 選択中バーがプレイ可能(曲、コース等ならtrue
 	{
-		switch (gOptions.get(eOption::SELECT_ENTRY_TYPE))
+		switch (State::get(IndexOption::SELECT_ENTRY_TYPE))
 		{
 		using namespace Option;
 		case ENTRY_FOLDER: set({ 1 }); break;
@@ -107,21 +107,19 @@ void updateDstOpt()
 		}
 	}
 
-	// 10 ダブルorダブルバトルならtrue
-	// 11 バトルならtrue
-	// 12 ダブルorバトルorダブルバトルならtrue
-	// 13 ゴーストバトルorバトルならtrue
+	// 10 ダブル or ダブルバトル ならtrue (flip?)
+	// 11 バトル ならtrue (HS, GAUGE 2P)
+	// 12 ダブル or バトル or ダブルバトル ならtrue (RANDOM, ASSIST, HID+SUD 2P)
+	// 13 ゴーストバトル or バトル ならtrue
 	{
-		auto m = gOptions.get(eOption::PLAY_MODE);
-		enum { SP, DP, SB, DB, GB } mode = decltype(mode)(m);
-		if (m == PLAY_BATTLE) mode = SB;
-		switch (mode)
+		switch (State::get(IndexOption::PLAY_MODE))
 		{
-		case SP: break;
-		case DP: set({ 10, 12 }); break;
-		case SB: set({ 11, 12, 13 }); break;
-		case DB: set({ 10, 12 }); break;
-		case GB: set({ 13 }); break;
+		case Option::PLAY_MODE_SINGLE: break;
+		case Option::PLAY_MODE_DOUBLE: set({ 10, 12 }); break;
+		case Option::PLAY_MODE_BATTLE: set({ 11, 12, 13 }); break;
+		case Option::PLAY_MODE_DOUBLE_BATTLE: set({ 10, 12 }); break;
+		case Option::PLAY_MODE_SP_GHOST_BATTLE: set({ 13 }); break;
+		case Option::PLAY_MODE_DP_GHOST_BATTLE: set({ 10, 12, 13 }); break;
 		}
 	}
 
@@ -129,42 +127,39 @@ void updateDstOpt()
 	// 21 パネル1起動時
 	{
 		set(20, sw({
-			eSwitch::SELECT_PANEL1,
-			eSwitch::SELECT_PANEL2,
-			eSwitch::SELECT_PANEL3,
-			eSwitch::SELECT_PANEL4,
-			eSwitch::SELECT_PANEL5,
-			eSwitch::SELECT_PANEL6,
-			eSwitch::SELECT_PANEL7,
-			eSwitch::SELECT_PANEL8,
-			eSwitch::SELECT_PANEL9,
+			IndexSwitch::SELECT_PANEL1,
+			IndexSwitch::SELECT_PANEL2,
+			IndexSwitch::SELECT_PANEL3,
+			IndexSwitch::SELECT_PANEL4,
+			IndexSwitch::SELECT_PANEL5,
+			IndexSwitch::SELECT_PANEL6,
+			IndexSwitch::SELECT_PANEL7,
+			IndexSwitch::SELECT_PANEL8,
+			IndexSwitch::SELECT_PANEL9,
 			}));
 		for (unsigned i = 21; i <= 29; ++i)
-			set(i, sw((eSwitch)(i - 21 + (unsigned)eSwitch::SELECT_PANEL1)));
+			set(i, sw((IndexSwitch)(i - 21 + (unsigned)IndexSwitch::SELECT_PANEL1)));
 	}
 
 	// 30 BGA normal
 	// 31 BGA extend
-	// 40 BGA off
-	// 41 BGA on
-	switch (gOptions.get(eOption::PLAY_BGA_TYPE))
+	switch (State::get(IndexOption::PLAY_BGA_SIZE))
 	{
-	using namespace Option;
-	case BGA_OFF: set(40); break;
-	case BGA_NORMAL: set({ 30, 41 }); break;
-	case BGA_EXTEND: set({ 31, 41 }); break;
+		using namespace Option;
+	case BGA_NORMAL: set(30); break;
+	case BGA_EXTEND: set(31); break;
 	}
 
 	// 32 autoplay off
 	// 33 autoplay on
-	set(32, !gSwitches.get(eSwitch::SYSTEM_AUTOPLAY));
-	set(33, gSwitches.get(eSwitch::SYSTEM_AUTOPLAY));
+	set(32, !State::get(IndexSwitch::SYSTEM_AUTOPLAY));
+	set(33, State::get(IndexSwitch::SYSTEM_AUTOPLAY));
 
 	// 34 ghost off
 	// 35 ghost typeA
 	// 36 ghost typeB
 	// 37 ghost typeC
-	switch (gOptions.get(eOption::PLAY_GHOST_TYPE_1P))
+	switch (State::get(IndexOption::PLAY_GHOST_TYPE_1P))
 	{
 	using namespace Option;
 	case GHOST_OFF: set(34); break;
@@ -175,8 +170,18 @@ void updateDstOpt()
 
 	// 38 scoregraph off
 	// 39 scoregraph on
-	set(38, !sw(eSwitch::SYSTEM_SCOREGRAPH));
-	set(39, sw(eSwitch::SYSTEM_SCOREGRAPH));
+	set(38, !sw(IndexSwitch::SYSTEM_SCOREGRAPH));
+	set(39, sw(IndexSwitch::SYSTEM_SCOREGRAPH));
+
+	// 40 BGA off
+	// 41 BGA on
+	switch (State::get(IndexOption::PLAY_BGA_TYPE))
+	{
+		using namespace Option;
+	case BGA_OFF:      set(40); break;
+	case BGA_ON:       set(41); break;
+	case BGA_AUTOPLAY: set(State::get(IndexSwitch::SYSTEM_AUTOPLAY) ? 41 : 40); break;
+	}
 
 	// 42 1P側がノーマルゲージ
 	// 43 1P側が赤ゲージ
@@ -184,14 +189,15 @@ void updateDstOpt()
 	// 45 2P側が赤ゲージ
 	{
 		using namespace Option;
-		set(42, dst(eOption::PLAY_GAUGE_TYPE_1P, { GAUGE_ASSIST, GAUGE_EASY, GAUGE_NORMAL }));
-		set(43, dst(eOption::PLAY_GAUGE_TYPE_1P, { GAUGE_HARD, GAUGE_EXHARD, GAUGE_DEATH }));
-		set(44, dst(eOption::PLAY_GAUGE_TYPE_2P, { GAUGE_ASSIST, GAUGE_EASY, GAUGE_NORMAL }));
-		set(45, dst(eOption::PLAY_GAUGE_TYPE_2P, { GAUGE_HARD, GAUGE_EXHARD, GAUGE_DEATH }));
+		set(42, dst(IndexOption::PLAY_GAUGE_TYPE_1P, { GAUGE_ASSIST, GAUGE_EASY, GAUGE_NORMAL }));
+		set(43, dst(IndexOption::PLAY_GAUGE_TYPE_1P, { GAUGE_HARD, GAUGE_EXHARD, GAUGE_DEATH }));
+		set(44, dst(IndexOption::PLAY_GAUGE_TYPE_2P, { GAUGE_ASSIST, GAUGE_EASY, GAUGE_NORMAL }));
+		set(45, dst(IndexOption::PLAY_GAUGE_TYPE_2P, { GAUGE_HARD, GAUGE_EXHARD, GAUGE_DEATH }));
 	}
 
 	// 46 難易度フィルタが有効
 	// 47 難易度フィルタが無効
+	// Note: It's an option of LR2 setup, not a runtime stat. Fix to ON
 	{
 		using namespace Option;
 		set(46);
@@ -199,27 +205,27 @@ void updateDstOpt()
 
 	// 50 オフライン
 	// 51 オンライン
-	set(50, !sw(eSwitch::NETWORK));
-	set(51, sw(eSwitch::NETWORK));
+	set(50, !sw(IndexSwitch::NETWORK));
+	set(51, sw(IndexSwitch::NETWORK));
 
 	// 52 EXTRA MODE OFF
 	// 53 EXTRA MODE ON
-	set(52, !sw(eSwitch::PLAY_OPTION_EXTRA));
-	set(53, sw(eSwitch::PLAY_OPTION_EXTRA));
+	set(52, !sw(IndexSwitch::PLAY_OPTION_EXTRA));
+	set(53, sw(IndexSwitch::PLAY_OPTION_EXTRA));
 
 	// 54 AUTOSCRATCH 1P OFF
 	// 55 AUTOSCRATCH 1P ON
 	// 56 AUTOSCRATCH 2P OFF
 	// 57 AUTOSCRATCH 2P ON
-	set(54, !sw(eSwitch::PLAY_OPTION_AUTOSCR_1P));
-	set(55, sw(eSwitch::PLAY_OPTION_AUTOSCR_1P));
-	set(56, !sw(eSwitch::PLAY_OPTION_AUTOSCR_2P));
-	set(57, sw(eSwitch::PLAY_OPTION_AUTOSCR_2P));
+	set(54, !sw(IndexSwitch::PLAY_OPTION_AUTOSCR_1P));
+	set(55, sw(IndexSwitch::PLAY_OPTION_AUTOSCR_1P));
+	set(56, !sw(IndexSwitch::PLAY_OPTION_AUTOSCR_2P));
+	set(57, sw(IndexSwitch::PLAY_OPTION_AUTOSCR_2P));
 
 	// 60 スコアセーブ不可能
 	// 61 スコアセーブ可能
-	set(60, !sw(eSwitch::CHART_CAN_SAVE_SCORE));
-	set(61, sw(eSwitch::CHART_CAN_SAVE_SCORE));
+	set(60, !sw(IndexSwitch::CHART_CAN_SAVE_SCORE));
+	set(61, sw(IndexSwitch::CHART_CAN_SAVE_SCORE));
 
 	// 62 クリアセーブ不可能
 	// 63 EASYゲージ （仕様書では「イージーでセーブ」）
@@ -228,18 +234,18 @@ void updateDstOpt()
 	// 66 DEATH/P-ATTACKゲージ （仕様書では「フルコンのみ」）
 	{
 		using namespace Option;
-		set(62, dst(eOption::CHART_SAVE_LAMP_TYPE, { LAMP_NOPLAY, LAMP_FAILED }));
-		set(63, dst(eOption::CHART_SAVE_LAMP_TYPE, { LAMP_ASSIST, LAMP_EASY }));
-		set(64, dst(eOption::CHART_SAVE_LAMP_TYPE, LAMP_NORMAL));
-		set(65, dst(eOption::CHART_SAVE_LAMP_TYPE, { LAMP_HARD, LAMP_EXHARD }));
-		set(66, dst(eOption::CHART_SAVE_LAMP_TYPE, { LAMP_FULLCOMBO, LAMP_PERFECT, LAMP_MAX }));
+		set(62, dst(IndexOption::CHART_SAVE_LAMP_TYPE, { LAMP_NOPLAY, LAMP_FAILED }));
+		set(63, dst(IndexOption::CHART_SAVE_LAMP_TYPE, { LAMP_ASSIST, LAMP_EASY }));
+		set(64, dst(IndexOption::CHART_SAVE_LAMP_TYPE, LAMP_NORMAL));
+		set(65, dst(IndexOption::CHART_SAVE_LAMP_TYPE, { LAMP_HARD, LAMP_EXHARD }));
+		set(66, dst(IndexOption::CHART_SAVE_LAMP_TYPE, { LAMP_FULLCOMBO, LAMP_PERFECT, LAMP_MAX }));
 	}
 
 	// 70 同フォルダbeginnerのレベルが規定値を越えていない(5/10keysはLV9、7/14keysはLV12、9keysはLV42以内)
 	// 75 同フォルダbeginnerのレベルが規定値を越えている
 	{
 		int ceiling = 12;
-		switch (gOptions.get(eOption::CHART_PLAY_KEYS))
+		switch (State::get(IndexOption::CHART_PLAY_KEYS))
 		{
 			using namespace Option;
 		case KEYS_7:
@@ -254,16 +260,16 @@ void updateDstOpt()
 		case KEYS_48:
 			ceiling = 90; break;
 		}
-		set(70, gNumbers.get(eNumber::MUSIC_BEGINNER_LEVEL) <= ceiling);
-		set(71, gNumbers.get(eNumber::MUSIC_NORMAL_LEVEL) <= ceiling);
-		set(72, gNumbers.get(eNumber::MUSIC_HYPER_LEVEL) <= ceiling);
-		set(73, gNumbers.get(eNumber::MUSIC_ANOTHER_LEVEL) <= ceiling);
-		set(74, gNumbers.get(eNumber::MUSIC_INSANE_LEVEL) <= ceiling);
-		set(75, gNumbers.get(eNumber::MUSIC_BEGINNER_LEVEL) > ceiling);
-		set(76, gNumbers.get(eNumber::MUSIC_NORMAL_LEVEL) > ceiling);
-		set(77, gNumbers.get(eNumber::MUSIC_HYPER_LEVEL) > ceiling);
-		set(78, gNumbers.get(eNumber::MUSIC_ANOTHER_LEVEL) > ceiling);
-		set(79, gNumbers.get(eNumber::MUSIC_INSANE_LEVEL) > ceiling);
+		set(70, State::get(IndexNumber::MUSIC_BEGINNER_LEVEL) <= ceiling);
+		set(71, State::get(IndexNumber::MUSIC_NORMAL_LEVEL) <= ceiling);
+		set(72, State::get(IndexNumber::MUSIC_HYPER_LEVEL) <= ceiling);
+		set(73, State::get(IndexNumber::MUSIC_ANOTHER_LEVEL) <= ceiling);
+		set(74, State::get(IndexNumber::MUSIC_INSANE_LEVEL) <= ceiling);
+		set(75, State::get(IndexNumber::MUSIC_BEGINNER_LEVEL) > ceiling);
+		set(76, State::get(IndexNumber::MUSIC_NORMAL_LEVEL) > ceiling);
+		set(77, State::get(IndexNumber::MUSIC_HYPER_LEVEL) > ceiling);
+		set(78, State::get(IndexNumber::MUSIC_ANOTHER_LEVEL) > ceiling);
+		set(79, State::get(IndexNumber::MUSIC_INSANE_LEVEL) > ceiling);
 	}
 
 
@@ -271,18 +277,21 @@ void updateDstOpt()
 	// 81 ロード完了
 	{
 		using namespace Option;
-		set(80, dst(eOption::PLAY_SCENE_STAT, { SPLAY_PREPARE, SPLAY_LOADING }));
+		set(80, dst(IndexOption::PLAY_SCENE_STAT, { SPLAY_PREPARE, SPLAY_LOADING }));
 		set(81, !_op[80]);
 	}
 
 	// 82 リプレイオフ
 	// 83 リプレイ録画中
 	// 84 リプレイ再生中
+	set(82, false);
+	set(83, !sw(IndexSwitch::SYSTEM_AUTOPLAY) && !gPlayContext.isReplay);
+	set(84, !sw(IndexSwitch::SYSTEM_AUTOPLAY) && gPlayContext.isReplay);
 
 	// 90 リザ クリア
 	// 91 リザ ミス
-	set(90, sw(eSwitch::RESULT_CLEAR));
-	set(91, !sw(eSwitch::RESULT_CLEAR));
+	set(90, sw(IndexSwitch::RESULT_CLEAR));
+	set(91, !sw(IndexSwitch::RESULT_CLEAR));
 
 
 	// /////////////////////////////////
@@ -295,9 +304,9 @@ void updateDstOpt()
 	// 105 FULL COMBO
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::SELECT_ENTRY_LAMP))
+		switch (State::get(IndexOption::SELECT_ENTRY_LAMP))
 		{
-		case LAMP_NOPLAY: set(100); break;
+		case LAMP_NOPLAY: set(100, get(5)); break;
 		case LAMP_FAILED: set(101); break;
 		case LAMP_ASSIST:
 		case LAMP_EASY: set(102); break;
@@ -313,7 +322,7 @@ void updateDstOpt()
 	// 110 AAA 8/9
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::SELECT_ENTRY_RANK))
+		switch (State::get(IndexOption::SELECT_ENTRY_RANK))
 		{
 		case RANK_0:
 		case RANK_1: set(110); break;
@@ -386,7 +395,7 @@ void updateDstOpt()
 	// 150 difficulty0 (未設定)
 	if (get(5))
 	{
-		switch (gOptions.get(eOption::CHART_DIFFICULTY))
+		switch (State::get(IndexOption::CHART_DIFFICULTY))
 		{
 			using namespace Option;
 		case DIFF_ANY: set(150); break;
@@ -409,7 +418,7 @@ void updateDstOpt()
 		// 164 9keys
 		{
 			using namespace Option;
-			switch (gOptions.get(eOption::CHART_PLAY_KEYS))
+			switch (State::get(IndexOption::CHART_PLAY_KEYS))
 			{
 			case KEYS_NOT_PLAYABLE: break;
 			case KEYS_7: set(160); break;
@@ -430,34 +439,34 @@ void updateDstOpt()
 
 		// 170 BGA無し
 		// 171 BGA有り
-		set(170, !sw(eSwitch::CHART_HAVE_BGA));
-		set(171, sw(eSwitch::CHART_HAVE_BGA));
+		set(170, !sw(IndexSwitch::CHART_HAVE_BGA));
+		set(171, sw(IndexSwitch::CHART_HAVE_BGA));
 
 		// 172 ロングノート無し
 		// 173 ロングノート有り
-		set(172, !sw(eSwitch::CHART_HAVE_LN));
-		set(173, sw(eSwitch::CHART_HAVE_LN));
+		set(172, !sw(IndexSwitch::CHART_HAVE_LN));
+		set(173, sw(IndexSwitch::CHART_HAVE_LN));
 
 		// 174 付属テキスト無し
 		// 175 付属テキスト有り
-		set(174, !sw(eSwitch::CHART_HAVE_README));
-		set(175, sw(eSwitch::CHART_HAVE_README));
+		set(174, !sw(IndexSwitch::CHART_HAVE_README));
+		set(175, sw(IndexSwitch::CHART_HAVE_README));
 
 		// 176 BPM変化無し
 		// 177 BPM変化有り
-		set(176, !sw(eSwitch::CHART_HAVE_BPMCHANGE));
-		set(177, sw(eSwitch::CHART_HAVE_BPMCHANGE));
+		set(176, !sw(IndexSwitch::CHART_HAVE_BPMCHANGE));
+		set(177, sw(IndexSwitch::CHART_HAVE_BPMCHANGE));
 
 		// 178 ランダム命令無し
 		// 179 ランダム命令有り
-		set(178, !sw(eSwitch::CHART_HAVE_RANDOM));
-		set(179, sw(eSwitch::CHART_HAVE_RANDOM));
+		set(178, !sw(IndexSwitch::CHART_HAVE_RANDOM));
+		set(179, sw(IndexSwitch::CHART_HAVE_RANDOM));
 
 		// 180 判定veryhard
 		// 181 判定hard
 		// 182 判定normal
 		// 183 判定easy
-		switch (gOptions.get(eOption::CHART_JUDGE_TYPE))
+		switch (State::get(IndexOption::CHART_JUDGE_TYPE))
 		{
 			using namespace Option;
 		case JUDGE_VHARD: set(180); break;
@@ -468,7 +477,7 @@ void updateDstOpt()
 
 		// 185 レベルが規定値内にある(5/10keysはLV9、7/14keysはLV12、9keysはLV42以内)
 		// 186 レベルが規定値を越えている
-		switch (gOptions.get(eOption::CHART_DIFFICULTY))
+		switch (State::get(IndexOption::CHART_DIFFICULTY))
 		{
 			using namespace Option;
 			//case DIFF_ANY: set(185); break;
@@ -481,22 +490,23 @@ void updateDstOpt()
 
 		// 190 STAGEFILE無し
 		// 191 STAGEFILE有り
-		set(190, !sw(eSwitch::CHART_HAVE_STAGEFILE));
-		set(191, sw(eSwitch::CHART_HAVE_STAGEFILE));
+		set(190, !sw(IndexSwitch::CHART_HAVE_STAGEFILE));
+		set(191, sw(IndexSwitch::CHART_HAVE_STAGEFILE));
 
 		// 192 BANNER無し
 		// 193 BANNER有り
-		set(192, !sw(eSwitch::CHART_HAVE_BANNER));
-		set(193, sw(eSwitch::CHART_HAVE_BANNER));
+		set(192, !sw(IndexSwitch::CHART_HAVE_BANNER));
+		set(193, sw(IndexSwitch::CHART_HAVE_BANNER));
 
 		// 194 BACKBMP無し
 		// 195 BACKBMP有り
-		set(194, !sw(eSwitch::CHART_HAVE_BACKBMP));
-		set(195, sw(eSwitch::CHART_HAVE_BACKBMP));
+		set(194, !sw(IndexSwitch::CHART_HAVE_BACKBMP));
+		set(195, sw(IndexSwitch::CHART_HAVE_BACKBMP));
 
 		// 196 リプレイ無し
 		// 197 リプレイ有り
-		set(196);
+		set(196, !sw(IndexSwitch::CHART_HAVE_REPLAY));
+		set(197, sw(IndexSwitch::CHART_HAVE_REPLAY));
 	}
 
 	// /////////////////////////////////
@@ -504,7 +514,7 @@ void updateDstOpt()
 	// 200 1P AAA
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::PLAY_RANK_ESTIMATED_1P))
+		switch (State::get(IndexOption::PLAY_RANK_ESTIMATED_1P))
 		{
 		case RANK_0:
 		case RANK_1: set(200); break;
@@ -522,7 +532,7 @@ void updateDstOpt()
 	// 210 2P AAA
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::PLAY_RANK_ESTIMATED_2P))
+		switch (State::get(IndexOption::PLAY_RANK_ESTIMATED_2P))
 		{
 		case RANK_0:
 		case RANK_1: set(210); break;
@@ -541,7 +551,7 @@ void updateDstOpt()
 	// 220 AAA確定
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::PLAY_RANK_BORDER_1P))
+		switch (State::get(IndexOption::PLAY_RANK_BORDER_1P))
 		{
 		case RANK_0:
 		case RANK_1: set(220); [[ fallthrough ]];
@@ -559,19 +569,19 @@ void updateDstOpt()
 	// 230 1P 0-10%
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::PLAY_ACCURACY_1P))
+		switch (State::get(IndexOption::PLAY_HEALTH_1P))
 		{
-		case ACC_0:  set(230); break;
-		case ACC_10: set(231); break;
-		case ACC_20: set(232); break;
-		case ACC_30: set(233); break;
-		case ACC_40: set(234); break;
-		case ACC_50: set(235); break;
-		case ACC_60: set(236); break;
-		case ACC_70: set(237); break;
-		case ACC_80: set(238); break;
-		case ACC_90: set(239); break;
-		case ACC_100: set(240); break;
+		case HEALTH_0:  set(230); break;
+		case HEALTH_10: set(231); break;
+		case HEALTH_20: set(232); break;
+		case HEALTH_30: set(233); break;
+		case HEALTH_40: set(234); break;
+		case HEALTH_50: set(235); break;
+		case HEALTH_60: set(236); break;
+		case HEALTH_70: set(237); break;
+		case HEALTH_80: set(238); break;
+		case HEALTH_90: set(239); break;
+		case HEALTH_100: set(240); break;
 		}
 	}
 
@@ -583,7 +593,7 @@ void updateDstOpt()
 	// 246 1P 空POOR
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::PLAY_LAST_JUDGE_1P))
+		switch (State::get(IndexOption::PLAY_LAST_JUDGE_1P))
 		{
 		case JUDGE_NONE: break;
 		case JUDGE_0: set(241); break;
@@ -603,19 +613,19 @@ void updateDstOpt()
 	// 250 2P 0-10%
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::PLAY_ACCURACY_2P))
+		switch (State::get(IndexOption::PLAY_HEALTH_2P))
 		{
-		case ACC_0:  set(250); break;
-		case ACC_10: set(251); break;
-		case ACC_20: set(252); break;
-		case ACC_30: set(253); break;
-		case ACC_40: set(254); break;
-		case ACC_50: set(255); break;
-		case ACC_60: set(256); break;
-		case ACC_70: set(257); break;
-		case ACC_80: set(258); break;
-		case ACC_90: set(259); break;
-		case ACC_100: set(260); break;
+		case HEALTH_0:  set(250); break;
+		case HEALTH_10: set(251); break;
+		case HEALTH_20: set(252); break;
+		case HEALTH_30: set(253); break;
+		case HEALTH_40: set(254); break;
+		case HEALTH_50: set(255); break;
+		case HEALTH_60: set(256); break;
+		case HEALTH_70: set(257); break;
+		case HEALTH_80: set(258); break;
+		case HEALTH_90: set(259); break;
+		case HEALTH_100: set(260); break;
 		}
 	}
 
@@ -627,7 +637,7 @@ void updateDstOpt()
 	// 266 2P 空POOR
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::PLAY_LAST_JUDGE_2P))
+		switch (State::get(IndexOption::PLAY_LAST_JUDGE_2P))
 		{
 		case JUDGE_0: set(261); break;
 		case JUDGE_1: set(262); break;
@@ -644,8 +654,8 @@ void updateDstOpt()
 
 	// 270 1P SUD+変更中
 	// 271 2P SUD+変更中
-	set(270, sw(eSwitch::P1_SETTING_SPEED));
-	set(271, sw(eSwitch::P2_SETTING_SPEED));
+	set(270, sw(IndexSwitch::P1_SETTING_LANECOVER));
+	set(271, sw(IndexSwitch::P2_SETTING_LANECOVER));
 
 	// 280 コースステージ1
 	// 281 コースステージ2
@@ -654,11 +664,12 @@ void updateDstOpt()
 	// 289 コースステージFINAL
 	// (注意 例えばSTAGE3が最終ステージの場合、ステージFINALが優先され、283オン、282オフとなります。)
 	// (現在は実装していませんが、今後の拡張に備えて284-288にあたるSTAGE5-9の画像もあらかじめ作っておいた方がいいかもしれません。
+	// Note: LR2 handle single song as FINAL
 	{
-		switch (gOptions.get(eOption::PLAY_COURSE_STAGE))
+		switch (State::get(IndexOption::PLAY_COURSE_STAGE))
 		{
 			using namespace Option;
-		case STAGE_NOT_COURSE: break;
+		case STAGE_NOT_COURSE: set(289); break;
 		case STAGE_1: set(280); break;
 		case STAGE_2: set(281); break;
 		case STAGE_3: set(282); break;
@@ -678,7 +689,7 @@ void updateDstOpt()
 	// 300 1P AAA
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::RESULT_RANK_1P))
+		switch (State::get(IndexOption::RESULT_RANK_1P))
 		{
 		case RANK_0:
 		case RANK_1: set(300); break;
@@ -696,7 +707,7 @@ void updateDstOpt()
 	// 310 2P AAA
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::RESULT_RANK_2P))
+		switch (State::get(IndexOption::RESULT_RANK_2P))
 		{
 		case RANK_0:
 		case RANK_1: set(310); break;
@@ -714,7 +725,7 @@ void updateDstOpt()
 	// 320 更新前 AAA
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::RESULT_MYBEST_RANK))
+		switch (State::get(IndexOption::RESULT_MYBEST_RANK))
 		{
 		case RANK_0:
 		case RANK_1: set(320); break;
@@ -730,24 +741,24 @@ void updateDstOpt()
 	}
 
 	// 330 スコアが更新された
-	set(330, sw(eSwitch::RESULT_UPDATED_SCORE));
+	set(330, sw(IndexSwitch::RESULT_UPDATED_SCORE));
 	// 331 MAXCOMBOが更新された
-	set(331, sw(eSwitch::RESULT_UPDATED_MAXCOMBO));
+	set(331, sw(IndexSwitch::RESULT_UPDATED_MAXCOMBO));
 	// 332 最小B+Pが更新された
-	set(332, sw(eSwitch::RESULT_UPDATED_BP));
+	set(332, sw(IndexSwitch::RESULT_UPDATED_BP));
 	// 333 トライアルが更新された
-	//set(333, sw(eSwitch::RESULT_UPDATED_TRIAL));
+	//set(333, sw(IndexSwitch::RESULT_UPDATED_TRIAL));
 	set(333, false);
 	// 334 IRの順位が更新された
-	//set(334, sw(eSwitch::RESULT_UPDATED_IRRANK));
+	//set(334, sw(IndexSwitch::RESULT_UPDATED_IRRANK));
 	set(334, false);
 	// 335 スコアランクが更新された
-	set(335, sw(eSwitch::RESULT_UPDATED_RANK));
+	set(335, sw(IndexSwitch::RESULT_UPDATED_RANK));
 
 	// 340 更新後 AAA
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::RESULT_UPDATED_RANK))
+		switch (State::get(IndexOption::RESULT_UPDATED_RANK))
 		{
 		case RANK_0:
 		case RANK_1: set(340); break;
@@ -769,6 +780,14 @@ void updateDstOpt()
 	// 352 1PWIN 2PLOSE
 	// 353 1PLOSE 2PWIN
 	// 354 DRAW
+	{
+		switch (State::get(IndexOption::RESULT_BATTLE_WIN_LOSE))
+		{
+		case 0: set(354); break;
+		case 1: set(352); break;
+		case 2: set(353); break;
+		}
+	}
 
 
 	// ///////////////////////////////////
@@ -779,7 +798,7 @@ void updateDstOpt()
 	// 402 5/10KEYS
 	{
 		using namespace Option;
-		switch (gOptions.get(eOption::KEY_CONFIG_MODE))
+		switch (State::get(IndexOption::KEY_CONFIG_MODE))
 		{
 		case KEYCFG_7: set(400); break;
 		case KEYCFG_9: set(401); break;
@@ -819,7 +838,7 @@ void updateDstOpt()
 
 	if (get(5))
 	{
-		switch (gOptions.get(eOption::CHART_DIFFICULTY))
+		switch (State::get(IndexOption::CHART_DIFFICULTY))
 		{
 			using namespace Option;
 		case DIFF_BEGINNER:
@@ -939,7 +958,7 @@ void updateDstOpt()
 	// LR2HelperG DST_OPTION HS-FIX 720-724
 	// Is there anybody using these? Let me know if needed
 	/*
-	switch (gOptions.get(eOption::PLAY_HSFIX_TYPE_1P))
+	switch (State::get(IndexOption::PLAY_HSFIX_TYPE_1P))
 	{
 	case Option::SPEED_NORMAL: set(720); break;
 	case Option::SPEED_FIX_MIN: set(721); break;
@@ -987,4 +1006,17 @@ void updateDstOpt()
 	// 622 ゴーストバトルではない
 	// 623 ゴーストバトル発動中(決定演出～リザルトの間のみ)
 	set(622);
+
+
+	// ///////////////////////////////////
+	// Added by Lunatic Vibes
+	
+	// 800: Lanecover Enabled 1P
+	// 801: FHS 1P
+	// 810: Lanecover Enabled 2P
+	// 811: FHS 2P
+	set(800, State::get(IndexSwitch::P1_LANECOVER_ENABLED));
+	set(810, State::get(IndexSwitch::P1_LOCK_SPEED));
+	set(810, State::get(IndexSwitch::P2_LANECOVER_ENABLED));
+	set(811, State::get(IndexSwitch::P2_LOCK_SPEED));
 }

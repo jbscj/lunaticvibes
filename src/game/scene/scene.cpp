@@ -1,7 +1,7 @@
 #include <execution>
 #include "scene.h"
 #include "common/beat.h"
-#include "game/data/data.h"
+#include "game/runtime/state.h"
 #include "game/skin/skin_mgr.h"
 #include "scene_context.h"
 #include "config/config_mgr.h"
@@ -20,7 +20,8 @@ vScene::vScene(eMode mode, unsigned rate, bool backgroundInput) :
 
     int notificationPosY = ConfigMgr::General()->get(cfg::V_RES_Y, CANVAS_HEIGHT);
     int notificationWidth = ConfigMgr::General()->get(cfg::V_RES_X, CANVAS_WIDTH);
-    const int notificationHeight = 24;
+    const int notificationHeight = 20;
+
 #if defined _WIN32
     TCHAR windir[MAX_PATH];
     GetWindowsDirectory(windir, MAX_PATH);
@@ -29,11 +30,13 @@ vScene::vScene(eMode mode, unsigned rate, bool backgroundInput) :
 #elif defined LINUX
     StringContent fontPath = "/usr/share/fonts/tbd.ttf"
 #endif
-    _fNotifications = std::make_shared<TTFFont>(fontPath.c_str(), notificationHeight);
+
+    const int textHeight = 16;
+    _fNotifications = std::make_shared<TTFFont>(fontPath.c_str(), int(textHeight * 1.5));
     _texNotificationsBG = std::make_shared<TextureFull>(0x000000ff);
     for (size_t i = 0; i < _sNotifications.size(); ++i)
     {
-        _sNotifications[i] = std::make_shared<SpriteText>(_fNotifications, eText(size_t(eText::_OVERLAY_NOTIFICATION_0) + i), TextAlign::TEXT_ALIGN_LEFT, notificationHeight);
+        _sNotifications[i] = std::make_shared<SpriteText>(_fNotifications, IndexText(size_t(IndexText::_OVERLAY_NOTIFICATION_0) + i), TextAlign::TEXT_ALIGN_LEFT, textHeight);
         _sNotifications[i]->setLoopTime(0);
         _sNotificationsBG[i] = std::make_shared<SpriteStatic>(_texNotificationsBG);
         _sNotificationsBG[i]->setLoopTime(0);
@@ -43,20 +46,23 @@ vScene::vScene(eMode mode, unsigned rate, bool backgroundInput) :
         f.time = 0;
         f.param.rect = Rect(0, notificationPosY, notificationWidth, notificationHeight);
         f.param.accel = RenderParams::CONSTANT;
-        f.param.color = 0xffffffff;
         f.param.blend = BlendMode::ALPHA;
         f.param.filter = false;
         f.param.angle = 0;
         f.param.center = Point(0, 0);
-        _sNotifications[i]->appendKeyFrame(f);
-
         f.param.color = 0xffffff80;
         _sNotificationsBG[i]->appendKeyFrame(f);
+
+        f.param.rect.y += (notificationHeight - textHeight) / 2;
+        f.param.rect.h = textHeight;
+        f.param.color = 0xffffffff;
+        _sNotifications[i]->appendKeyFrame(f);
     }
     {
-        int textHeight = 16;
-        _sTopLeft = std::make_shared<SpriteText>(_fNotifications, eText::_OVERLAY_TOPLEFT, TextAlign::TEXT_ALIGN_LEFT, textHeight);
+        _sTopLeft = std::make_shared<SpriteText>(_fNotifications, IndexText::_OVERLAY_TOPLEFT, TextAlign::TEXT_ALIGN_LEFT, textHeight);
         _sTopLeft->setLoopTime(0);
+        _sTopLeft2 = std::make_shared<SpriteText>(_fNotifications, IndexText::_OVERLAY_TOPLEFT2, TextAlign::TEXT_ALIGN_LEFT, textHeight);
+        _sTopLeft2->setLoopTime(0);
         RenderKeyFrame f;
         f.time = 0;
         f.param.rect = Rect(0, 0, notificationWidth, textHeight);
@@ -67,16 +73,9 @@ vScene::vScene(eMode mode, unsigned rate, bool backgroundInput) :
         f.param.angle = 0;
         f.param.center = Point(0, 0);
         _sTopLeft->appendKeyFrame(f);
+        f.param.rect.y += 24;
+        _sTopLeft2->appendKeyFrame(f);
     }
-
-	Time t;
-
-    //gNumbers.reset();
-    //gSliders.reset();
-    //gSwitches.reset();
-    gTimers.reset();
-
-    gTexts.set(eText::_OVERLAY_TOPLEFT, "");
 
     _input.register_p("DEBUG_TOGGLE", std::bind(&vScene::DebugToggle, this, std::placeholders::_1, std::placeholders::_2));
 
@@ -84,8 +83,16 @@ vScene::vScene(eMode mode, unsigned rate, bool backgroundInput) :
     _input.register_h("SKIN_MOUSE_DRAG", std::bind(&vScene::MouseDrag, this, std::placeholders::_1, std::placeholders::_2));
     _input.register_r("SKIN_MOUSE_RELEASE", std::bind(&vScene::MouseRelease, this, std::placeholders::_1, std::placeholders::_2));
 
-    // Skin may be cached. Reset mouse status
-    _skin ? _skin->setHandleMouseEvents(true) : __noop;
+    if (_skin && 
+        !(gNextScene == eScene::SELECT && mode == eMode::THEME_SELECT))
+    {
+        State::resetTimer();
+
+        State::set(IndexText::_OVERLAY_TOPLEFT, "");
+
+        // Skin may be cached. Reset mouse status
+        _skin->setHandleMouseEvents(true);
+    }
 }
 
 vScene::~vScene() 
@@ -114,38 +121,47 @@ void vScene::update()
         checkAndStartTextEdit();
     }
 
-    std::unique_lock lock(gOverlayContext._mutex);
-    // notifications expire check
-    while (!gOverlayContext.notifications.empty() && (t - gOverlayContext.notifications.begin()->first).norm() > 10 * 1000) // 10s
+    // update notifications
     {
-        gOverlayContext.notifications.pop_front();
-    }
-    // update texts
-    auto itNotifications = gOverlayContext.notifications.rbegin();
-    for (size_t i = 0; i < _sNotifications.size(); ++i)
-    {
-        if (itNotifications != gOverlayContext.notifications.rend())
+        std::unique_lock lock(gOverlayContext._mutex);
+
+        // notifications expire check
+        while (!gOverlayContext.notifications.empty() && (t - gOverlayContext.notifications.begin()->first).norm() > 10 * 1000) // 10s
         {
-            gTexts.queue(eText(size_t(eText::_OVERLAY_NOTIFICATION_0) + i), itNotifications->second);
-            ++itNotifications;
+            gOverlayContext.notifications.pop_front();
         }
-        else
+
+        // update notification texts
+        auto itNotifications = gOverlayContext.notifications.rbegin();
+        for (size_t i = 0; i < _sNotifications.size(); ++i)
         {
-            gTexts.queue(eText(size_t(eText::_OVERLAY_NOTIFICATION_0) + i), "");
+            if (itNotifications != gOverlayContext.notifications.rend())
+            {
+                State::set(IndexText(size_t(IndexText::_OVERLAY_NOTIFICATION_0) + i), itNotifications->second);
+                ++itNotifications;
+            }
+            else
+            {
+                State::set(IndexText(size_t(IndexText::_OVERLAY_NOTIFICATION_0) + i), "");
+            }
         }
     }
-    gTexts.flush();
+
+    // update top-left texts
     for (size_t i = 0; i < _sNotifications.size(); ++i)
     {
         _sNotifications[i]->update(t);
         _sNotificationsBG[i]->update(t);
+
     }
     _sTopLeft->update(t);
+    _sTopLeft2->update(t);
 
     // update videos
     TextureVideo::updateAll();
 
-    auto ss = gTimers.get(eTimer::SCENE_START);
+    // ImGui
+    auto ss = State::get(IndexTimer::SCENE_START);
     auto rt = t.norm() - ss;
     if (ss != TIMER_NEVER && rt > 1000)
     {
@@ -159,6 +175,7 @@ void vScene::update()
 
 void vScene::MouseClick(InputMask& m, const Time& t)
 {
+    if (!_skin) return;
     if (m[Input::Pad::M1])
     {
         auto [x, y] = _input.getCursorPos();
@@ -168,6 +185,7 @@ void vScene::MouseClick(InputMask& m, const Time& t)
 
 void vScene::MouseDrag(InputMask& m, const Time& t)
 {
+    if (!_skin) return;
     if (m[Input::Pad::M1])
     {
         auto [x, y] = _input.getCursorPos();
@@ -177,6 +195,7 @@ void vScene::MouseDrag(InputMask& m, const Time& t)
 
 void vScene::MouseRelease(InputMask& m, const Time& t)
 {
+    if (!_skin) return;
     if (m[Input::Pad::M1])
     {
         _skin->update_mouse_release();
@@ -189,6 +208,8 @@ void vScene::draw() const
 
     _sTopLeft->updateText();
     _sTopLeft->draw();
+    _sTopLeft2->updateText();
+    _sTopLeft2->draw();
 
     {
         std::shared_lock lock(gOverlayContext._mutex);
@@ -296,9 +317,9 @@ bool vScene::isInTextEdit() const
     return inTextEdit;
 }
 
-eText vScene::textEditType() const
+IndexText vScene::textEditType() const
 {
-    return inTextEdit ? _skin->textEditType() : eText::INVALID;
+    return inTextEdit ? _skin->textEditType() : IndexText::INVALID;
 }
 
 void vScene::startTextEdit(bool clear)

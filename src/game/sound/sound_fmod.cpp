@@ -8,6 +8,7 @@
 #include "config/config_mgr.h"
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
 
@@ -702,7 +703,7 @@ void SoundDriverFMOD::loadSampleThread()
 
 int SoundDriverFMOD::loadNoteSample(const Path& spath, size_t index)
 {
-    if (spath.empty()) return 0;
+    if (spath.empty()) return -1;
 
     if (noteSamples[index].objptr != nullptr)
     {
@@ -711,7 +712,7 @@ int SoundDriverFMOD::loadNoteSample(const Path& spath, size_t index)
     }
     
     std::string path = spath.u8string();
-    int flags = FMOD_LOOP_OFF | FMOD_UNIQUE;
+    int flags = FMOD_LOOP_OFF | FMOD_UNIQUE | FMOD_CREATESAMPLE;
 
 	FMOD_RESULT r = FMOD_ERR_FILE_NOTFOUND;
 	if (fs::exists(spath) && fs::is_regular_file(spath))
@@ -734,7 +735,7 @@ int SoundDriverFMOD::loadNoteSample(const Path& spath, size_t index)
         LOG_DEBUG << "[FMOD] Loading Sample (" + path + ") Error: " << r << ", " << FMOD_ErrorString(r);
     }
 
-    return 1;
+    return (r == FMOD_OK) ? 0 : 1;
 }
 
 void SoundDriverFMOD::playNoteSample(SoundChannelType ch, size_t count, size_t index[])
@@ -768,9 +769,19 @@ void SoundDriverFMOD::freeNoteSamples()
     }
 }
 
+long long SoundDriverFMOD::getNoteSampleLength(size_t index)
+{
+    if (noteSamples[index].objptr == nullptr) return 0;
+    auto sample = noteSamples[index].objptr;
+
+    unsigned length = 0;
+    sample->getLength(&length, FMOD_TIMEUNIT_MS);
+    return length;
+}
+
 int SoundDriverFMOD::loadSysSample(const Path& spath, size_t index, bool isStream, bool loop)
 {
-    if (spath.empty()) return 0;
+    if (spath.empty()) return -1;
     
     if (sysSamples[index].objptr != nullptr)
     {
@@ -805,7 +816,7 @@ int SoundDriverFMOD::loadSysSample(const Path& spath, size_t index, bool isStrea
         LOG_DEBUG << "[FMOD] Loading Sample (" + path + ") Error: " << r << ", " << FMOD_ErrorString(r);
     }
 
-    return r;
+    return (r == FMOD_OK) ? 0 : 1;
 }
 
 void SoundDriverFMOD::playSysSample(SoundChannelType ch, size_t index)
@@ -838,6 +849,28 @@ void SoundDriverFMOD::freeSysSamples()
 void SoundDriverFMOD::update()
 {
     if (!fmodSystem) return;
+
+    if (sysVolume != sysVolumeGradientEnd)
+    {
+        if (sysVolumeGradientLength == 0)
+        {
+            sysVolume = sysVolumeGradientEnd;
+        }
+        else
+        {
+            double progress = double((Time() - sysVolumeGradientBeginTime).norm()) / sysVolumeGradientLength;
+            if (progress >= 1.0)
+            {
+                sysVolume = sysVolumeGradientEnd;
+            }
+            else
+            {
+                sysVolume = sysVolumeGradientBegin + (sysVolumeGradientEnd - sysVolumeGradientBegin) * progress;
+            }
+        }
+        setVolume(SampleChannel::BGM, volume[SampleChannel::BGM]);
+    }
+
     FMOD_RESULT r = fmodSystem->update();
     if (r != FMOD_OK)
         LOG_ERROR << "[FMOD] SoundDriverFMOD System Update Error: " << r << ", " << FMOD_ErrorString(r);
@@ -850,6 +883,14 @@ int SoundDriverFMOD::getChannelsPlaying()
     return c;
 }
 
+void SoundDriverFMOD::setSysVolume(float v, int gradientTime)
+{
+    sysVolumeGradientBegin = sysVolume;
+    sysVolumeGradientEnd = v;
+    sysVolumeGradientBeginTime = Time();
+    sysVolumeGradientLength = gradientTime;
+}
+
 void SoundDriverFMOD::setVolume(SampleChannel ch, float v)
 {
     volume[ch] = v;
@@ -857,19 +898,19 @@ void SoundDriverFMOD::setVolume(SampleChannel ch, float v)
     switch (ch)
     {
     case SampleChannel::MASTER:
-        channelGroup[SoundChannelType::BGM_SYS]->setVolume(volume[SampleChannel::MASTER] * volume[SampleChannel::BGM]);
+        channelGroup[SoundChannelType::BGM_SYS]->setVolume(sysVolume * volume[SampleChannel::MASTER] * volume[SampleChannel::BGM]);
         channelGroup[SoundChannelType::BGM_NOTE]->setVolume(volume[SampleChannel::MASTER] * volume[SampleChannel::BGM]);
-        channelGroup[SoundChannelType::KEY_SYS]->setVolume(volume[SampleChannel::MASTER] * volume[SampleChannel::KEY]);
+        channelGroup[SoundChannelType::KEY_SYS]->setVolume(sysVolume * volume[SampleChannel::MASTER] * volume[SampleChannel::KEY]);
         channelGroup[SoundChannelType::KEY_LEFT]->setVolume(volume[SampleChannel::MASTER] * volume[SampleChannel::KEY]);
         channelGroup[SoundChannelType::KEY_RIGHT]->setVolume(volume[SampleChannel::MASTER] * volume[SampleChannel::KEY]);
         break;
     case SampleChannel::KEY:
-        channelGroup[SoundChannelType::KEY_SYS]->setVolume(volume[SampleChannel::MASTER] * volume[SampleChannel::KEY]);
+        channelGroup[SoundChannelType::KEY_SYS]->setVolume(sysVolume * volume[SampleChannel::MASTER] * volume[SampleChannel::KEY]);
         channelGroup[SoundChannelType::KEY_LEFT]->setVolume(volume[SampleChannel::MASTER] * volume[SampleChannel::KEY]);
         channelGroup[SoundChannelType::KEY_RIGHT]->setVolume(volume[SampleChannel::MASTER] * volume[SampleChannel::KEY]);
         break;
     case SampleChannel::BGM:
-        channelGroup[SoundChannelType::BGM_SYS]->setVolume(volume[SampleChannel::MASTER] * volume[SampleChannel::BGM]);
+        channelGroup[SoundChannelType::BGM_SYS]->setVolume(sysVolume * volume[SampleChannel::MASTER] * volume[SampleChannel::BGM]);
         channelGroup[SoundChannelType::BGM_NOTE]->setVolume(volume[SampleChannel::MASTER] * volume[SampleChannel::BGM]);
         break;
     }

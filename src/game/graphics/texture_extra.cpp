@@ -70,6 +70,11 @@ void TextureVideo::seek(int64_t sec)
 	pVideo->seek(sec);
 }
 
+void TextureVideo::setSpeed(double speed)
+{
+	pVideo->setSpeed(speed);
+}
+
 void TextureVideo::update()
 {
 	if (!pVideo) return;
@@ -173,7 +178,7 @@ bool TextureBmsBga::addBmp(size_t idx, Path pBmp)
 		{
 #ifndef VIDEO_DISABLED
 			objs[idx].type = obj::Ty::VIDEO;
-			objs[idx].pt = std::make_shared<TextureVideo>(std::make_shared<sVideo>(pBmp));
+			objs[idx].pt = std::make_shared<TextureVideo>(std::make_shared<sVideo>(pBmp, gSelectContext.pitchSpeed, false));
 			LOG_DEBUG << "[TextureBmsBga] added video: " << pBmp.u8string();
 			return true;
 #else
@@ -230,7 +235,7 @@ void TextureBmsBga::sortSlot()
 	poorIt = poorSlot.begin();
 }
 
-bool TextureBmsBga::setSlotFromBMS(chartBMS& bms)
+bool TextureBmsBga::setSlotFromBMS(ChartObjectBMS& bms)
 {
 	baseSlot.clear();
 	layerSlot.clear();
@@ -434,6 +439,29 @@ void TextureBmsBga::stopUpdate()
 	resetSub(baseSlot);
 	resetSub(layerSlot);
 	resetSub(poorSlot);
+#endif
+}
+
+void TextureBmsBga::setVideoSpeed()
+{
+#ifndef VIDEO_DISABLED
+	auto setSpeed = [this](decltype(baseSlot)& slot)
+	{
+		for (auto it = slot.begin(); it != slot.end(); ++it)	// search from beginning
+		{
+			auto [time, idx] = *it;
+			if (objs[idx].type == obj::Ty::VIDEO)
+			{
+				auto pt = std::reinterpret_pointer_cast<TextureVideo>(objs[idx].pt);
+				pt->setSpeed(gSelectContext.pitchSpeed);
+			}
+		}
+		//slotIt = slot.end();	// not found
+	};
+
+	setSpeed(baseSlot);
+	setSpeed(layerSlot);
+	setSpeed(poorSlot);
 #endif
 }
 

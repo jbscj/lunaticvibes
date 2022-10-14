@@ -33,10 +33,10 @@ protected:
 
 private:
     bool _isExitingFromPlay = false;
-    std::array<bool, 2>     _isPlayerFinished{ false };
+    std::array<bool, 2>     _isPlayerFinished{ false, false };
 
-    std::array<bool, 2>     _isHoldingStart = { false };
-    std::array<bool, 2>     _isHoldingSelect = { false };
+    std::array<bool, 2>     _isHoldingStart = { false, false };
+    std::array<bool, 2>     _isHoldingSelect = { false, false };
     std::array<Time, 2>     _startPressedTime = { TIMER_NEVER, TIMER_NEVER };
     std::array<Time, 2>     _selectPressedTime = { TIMER_NEVER, TIMER_NEVER };
 
@@ -47,13 +47,20 @@ private:
     std::array<Time, 2>     _scratchLastUpdate{ TIMER_NEVER, TIMER_NEVER };
     std::array<double, 2>   _scratchAccumulator = { 0, 0 };
 
-    std::array<bool, 2>     _lanecoverEnabled{ false };
-    std::array<bool, 2>     _lockspeedEnabled{ false };
-    std::array<double, 2>   _lockspeedValue{ 0 };
-    std::array<int, 2>      _lockspeedGreenNumber{ 0 };
+    std::array<double, 2>   _lockspeedValue{ 0 };           // internal use only, for precise calculation
+    std::array<int, 2>      _lockspeedGreenNumber{ 0 };     // green number integer
 
     std::array<int, 2>      _hispeedAdd{ 0 };
     std::array<int, 2>      _lanecoverAdd{ 0 };
+
+    std::array<double, 2>   _hispeedOld{ 1.0, 1.0 };
+    std::array<bool, 2>     _laneEffectHIDDEN { false, false };
+    std::array<bool, 2>     _laneEffectSUDHID { false, false };
+
+    Time _readyTime = 0;
+
+    std::vector<ReplayChart::Commands>::iterator itReplayCommand;
+    InputMask replayKeyPressing;
 
     std::array<int, 2>      _missPlayer = { 0 };
     Time _missLastTime;
@@ -62,6 +69,9 @@ private:
 public:
     ScenePlay();
     virtual ~ScenePlay();
+    void clearGlobalDatas();
+    bool createChartObj();
+    bool createRuleset();
 
 protected:
     void setTempInitialHealthBMS();
@@ -124,5 +134,7 @@ protected:
     void inputGamePress(InputMask&, const Time&);
     void inputGameHold(InputMask&, const Time&);
     void inputGameRelease(InputMask&, const Time&);
+    void inputGamePressTimer(InputMask&, const Time&);
+    void inputGameReleaseTimer(InputMask&, const Time&);
     void inputGameAxis(double s1, double s2, const Time&);
 };

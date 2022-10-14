@@ -11,6 +11,7 @@
 #include "re2/re2.h"
 
 #ifdef WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <wincrypt.h>
 #else
@@ -19,24 +20,24 @@
 
 static const std::pair<RE2, re2::StringPiece> path_replace_pattern[]
 {
-    {"\\\\", "\\\\\\\\"},
-    {"\\^", "\\\\^"},
-    {"\\.", "\\\\."},
-    {"\\$", "\\\\$"},
-    {"\\|", "\\\\|"},
-    {"\\(", "\\\\("},
-    {"\\)", "\\\\)"},
-    {"\\{", "\\\\{"},
-    {"\\{", "\\\\{"},
-    {"\\[", "\\\\["},
-    {"\\]", "\\\\]"},
-    {"\\+", "\\\\+"},
-    {"\\/", "\\\\/"},
-    {"\\?", "."},
-    {"\\*", ".*"},
+    {R"(\\)", R"(\\\\)"},
+    {R"(\.)", R"(\\.)"},
+    {R"(\^)", R"(\\^)"},
+    {R"(\$)", R"(\\$)"},
+    {R"(\|)", R"(\\|)"},
+    {R"(\()", R"(\\()"},
+    {R"(\))", R"(\\))"},
+    {R"(\{)", R"(\\{)"},
+    {R"(\{)", R"(\\{)"},
+    {R"(\[)", R"(\\[)"},
+    {R"(\])", R"(\\])"},
+    {R"(\+)", R"(\\+)"},
+    {R"(\/)", R"(\\/)"},
+    {R"(\?)", R"([^\\\\])"},
+    {R"(\*)", R"([^\\\\]*)"},
 };
 
-std::vector<Path> findFiles(Path p)
+std::vector<Path> findFiles(Path p, bool recursive)
 {
 	auto pstr = p.make_preferred().native();
 	size_t offset = pstr.find('*');
@@ -61,11 +62,23 @@ std::vector<Path> findFiles(Path p)
         }
 
         auto pathRegex = RE2(str);
-        for (auto& f : fs::recursive_directory_iterator(folder))
+        Path pathFolder(folder);
+        for (auto& f : fs::recursive_directory_iterator(pathFolder))
         {
-            if (f.path().filename().u8string().substr(0, 2) != "._" && RE2::FullMatch(f.path().u8string(), pathRegex))
+            if (recursive)
             {
-                res.push_back(f.path());
+                if (f.path().filename().u8string().substr(0, 2) != "._" && RE2::FullMatch(f.path().filename().u8string(), pathRegex))
+                {
+                    res.push_back(f.path());
+                }
+            }
+            else
+            {
+                auto relativeFilePath = fs::relative(f, pathFolder);
+                if (relativeFilePath.u8string().substr(0, 2) != "._" && RE2::FullMatch(relativeFilePath.u8string(), pathRegex))
+                {
+                    res.push_back(f.path());
+                }
             }
         }
     }
@@ -387,7 +400,7 @@ void preciseSleep(long long sleep_ns)
 
 #else
 
-    // not optimized and not accurate
+    // FIXME not optimized and not accurate
     std::this_thread::sleep_for(sleep_ns);
 
 #endif

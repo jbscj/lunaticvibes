@@ -10,9 +10,11 @@
 #include "game/chart/chart.h"
 #include "game/ruleset/ruleset.h"
 #include "game/graphics/texture_extra.h"
+#include "game/replay/replay_chart.h"
 #include "common/entry/entry_folder.h"
 #include "db/db_song.h"
 #include "db/db_score.h"
+#include "common/difficultytable/table_bms.h"
 
 inline eScene gNextScene = eScene::SELECT;
 
@@ -22,11 +24,16 @@ struct ChartContextParams
 {
     Path path{};
     HashMD5 hash{};
-    std::shared_ptr<vChartFormat> chartObj;
+    std::shared_ptr<ChartFormatBase> chartObj;
+    std::shared_ptr<ChartFormatBase> chartObjMybest;
+
     //bool isChartSamplesLoaded;
     bool isSampleLoaded = false;
     bool isBgaLoaded = false;
 	bool started = false;
+
+    // DP flags
+    bool isDoubleBattle = false;
 
     // For displaying purpose, typically fetch from song db directly
     StringContent title{};
@@ -40,8 +47,6 @@ struct ChartContextParams
     BPM minBPM = 150;
     BPM maxBPM = 150;
     BPM startBPM = 150;
-    double HSFixBPMFactor1P = 1.0;
-    double HSFixBPMFactor2P = 1.0;
 
     TextureDynamic texStagefile;
     TextureDynamic texBackbmp;
@@ -50,63 +55,69 @@ struct ChartContextParams
 
 ////////////////////////////////////////////////////////////////////////////////
 
-constexpr unsigned MAX_PLAYERS = 8;
-constexpr unsigned PLAYER_SLOT_1P = 0;
-constexpr unsigned PLAYER_SLOT_2P = 1;
+constexpr unsigned MAX_PLAYERS = 3;
+constexpr unsigned PLAYER_SLOT_PLAYER = 0;
+constexpr unsigned PLAYER_SLOT_TARGET = 1;
+constexpr unsigned PLAYER_SLOT_MYBEST = 2;
 struct PlayContextParams
 {
     eMode mode = eMode::PLAY7;
     bool canRetry = false;
     bool isCourse = false;
     bool isCourseFirstStage = false;
-    unsigned judgeLevel = 0;
 
-    std::shared_ptr<chart::vChart> chartObj[2]{ nullptr, nullptr };
-    double initialHealth[2]{ 1.0, 1.0 };
+    unsigned judgeLevel = 0;
 
 	std::shared_ptr<TextureBmsBga> bgaTexture = std::make_shared<TextureBmsBga>();
 
-    // gauge/score graph key points
-    // managed by SLOT, which includes local battle 1P/2P and multi battle player slots
-    // maximum slot is MAX_PLAYERS
+    std::array<std::shared_ptr<ChartObjectBase>, MAX_PLAYERS> chartObj{ nullptr, nullptr, nullptr };
+    std::array<double, MAX_PLAYERS> initialHealth{ 1.0, 1.0, 1.0 };
     std::array<std::vector<int>, MAX_PLAYERS> graphGauge;
     std::array<std::vector<int>, MAX_PLAYERS> graphScore;
-    std::vector<int> graphScoreTarget;
     std::array<eGaugeOp, MAX_PLAYERS> gaugeType{};        // resolve on ruleset construction
     std::array<PlayMod, MAX_PLAYERS> mods{};         // eMod: 
-
-    // TODO FLIP
 
     eRuleset rulesetType = eRuleset::BMS;
     std::array<std::shared_ptr<vRuleset>, MAX_PLAYERS> ruleset;
 
+    std::shared_ptr<ReplayChart> replay;
+    std::shared_ptr<ReplayChart> replayMybest;
+    std::shared_ptr<ReplayChart> replayNew;
+
     Time remainTime;
 
-    unsigned int randomSeedChart;
-    unsigned int randomSeedMod;
+    uint64_t randomSeed;
 
     bool isAuto = false;
+    bool isReplay = false;
+    bool haveReplay = false;
 
     double Hispeed = 2.0;
 
     // BATTLE 2P side settings
     bool isBattle = false;  // Note: DB is NOT Battle
     double battle2PHispeed = 2.0;
-    bool battle2PLanecover = false;
     int battle2PLanecoverTop = 0;
     int battle2PLanecoverBottom = 0;
-    bool battle2PLockSpeed = false;
     int battle2PGreenNumber = 1200;
+
+    Time HispeedGradientStart;
+    double HispeedGradientFrom = 2.0;
+    double HispeedGradientNow = 2.0;
+    Time battle2PHispeedGradientStart;
+    double battle2PHispeedGradientFrom = 2.0;
+    double battle2PHispeedGradientNow = 2.0;
 };
 
 std::pair<bool, Option::e_lamp_type> getSaveScoreType();
 void clearContextPlayForRetry();
 void clearContextPlay();
+
 void pushGraphPoints();
 
 ////////////////////////////////////////////////////////////////////////////////
 
-typedef std::pair<std::shared_ptr<vEntry>, std::shared_ptr<vScore>> Entry;
+typedef std::pair<std::shared_ptr<EntryBase>, std::shared_ptr<vScore>> Entry;
 typedef std::vector<Entry> EntryList;
 
 struct SongListProperties
@@ -137,9 +148,14 @@ struct SelectContextParams
     EntryList entries;
     size_t idx = 0;     // current selected entry index
     size_t cursor = 0;  // highlighted bar index
+    bool entryDragging = 0;    // is dragging slider
+
     SongListSort sort = SongListSort::DEFAULT;
     unsigned filterDifficulty = 0; // all / B / N / H / A / I (type 0 is not included)
     unsigned filterKeys = 0; // all / 5, 7, 9, 10, 14, etc
+
+    std::vector<DifficultyTableBMS> tables;
+
     double pitchSpeed = 1.0;
 
     unsigned scrollTimeLength = 300; // 
@@ -157,6 +173,7 @@ void loadSongList();
 void sortSongList();
 void setBarInfo();
 void setEntryInfo();
+void setPlayModeInfo();
 
 void setDynamicTextures();
 
@@ -173,12 +190,15 @@ struct KeyConfigContextParams
 struct CustomizeContextParams
 {
     eMode mode;
+    bool modeUpdate = false;
 
-    int skinDir;
+    int skinDir = 0;
 
-    bool optionUpdate;
+    bool optionUpdate = false;
     size_t optionIdx;
-    int optionDir;
+    int optionDir = 0;
+
+    bool optionDragging = false;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -191,6 +211,9 @@ struct UpdateContextParams
     // vSkin / Sprite
     double metre;
     unsigned bar;
+
+    int liftHeight1P = 0;
+    int liftHeight2P = 0;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

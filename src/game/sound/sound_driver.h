@@ -63,12 +63,14 @@ public:
     virtual void playNoteSample(SoundChannelType ch, size_t count, size_t index[]) = 0;
     virtual void stopNoteSamples() = 0;
     virtual void freeNoteSamples() = 0;
+    virtual long long getNoteSampleLength(size_t index) = 0;  // in ms
     virtual int loadSysSample(const Path& path, size_t index, bool isStream = false, bool loop = false) = 0;
     virtual void playSysSample(SoundChannelType ch, size_t index) = 0;
     virtual void stopSysSamples() = 0;
     virtual void freeSysSamples() = 0;
 
 public:
+    virtual void setSysVolume(float v, int gradientTime = 0) = 0;
     virtual void setVolume(SampleChannel ch, float v) = 0;
     virtual void setDSP(DSPType type, int index, SampleChannel ch, float p1, float p2) = 0;
     virtual void setFreqFactor(double f) = 0;

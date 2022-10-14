@@ -83,7 +83,7 @@ public:
     void stopSpriteVideoPlayback();
 
     bool textEditSpriteClicked() const;
-    eText textEditType() const;
+    IndexText textEditType() const;
     void startTextEdit(bool clear);
     void stopTextEdit(bool modify);
 
@@ -145,4 +145,5 @@ public:
     bool isSupportExHardAndAssistEasy = false;
     bool isSupportFastSlow = false;
     bool isSupportGreenNumber = false;
+    bool isSupportLift = false;
 };

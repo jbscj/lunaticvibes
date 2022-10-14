@@ -56,90 +56,98 @@ public:
         {5, 5, 10, 200, 600}          // XD
     };
 
-    typedef std::map<chart::NoteLaneIndex, eTimer> NoteLaneTimerMap;
+    typedef std::map<chart::NoteLaneIndex, IndexTimer> NoteLaneTimerMap;
 
-    inline static const NoteLaneTimerMap bombTimer7k = {
-        {chart::Sc1, eTimer::S1_BOMB},
-        {chart::K1,  eTimer::K11_BOMB},
-        {chart::K2,  eTimer::K12_BOMB},
-        {chart::K3,  eTimer::K13_BOMB},
-        {chart::K4,  eTimer::K14_BOMB},
-        {chart::K5,  eTimer::K15_BOMB},
-        {chart::K6,  eTimer::K16_BOMB},
-        {chart::K7,  eTimer::K17_BOMB},
-    };
+    inline static const NoteLaneTimerMap bombTimer5k = { {
+        {chart::Sc1, IndexTimer::S1_BOMB},
+        {chart::K1,  IndexTimer::K11_BOMB},
+        {chart::K2,  IndexTimer::K12_BOMB},
+        {chart::K3,  IndexTimer::K13_BOMB},
+        {chart::K4,  IndexTimer::K14_BOMB},
+        {chart::K5,  IndexTimer::K15_BOMB},
+        {chart::K6,  IndexTimer::K21_BOMB},
+        {chart::K7,  IndexTimer::K22_BOMB},
+        {chart::K8,  IndexTimer::K23_BOMB},
+        {chart::K9,  IndexTimer::K24_BOMB},
+        {chart::K10, IndexTimer::K25_BOMB},
+        {chart::Sc2, IndexTimer::S2_BOMB},
+    } };
+
+    inline static const NoteLaneTimerMap bombTimer5kLN = { {
+        {chart::Sc1, IndexTimer::S1_LN_BOMB},
+        {chart::K1,  IndexTimer::K11_LN_BOMB},
+        {chart::K2,  IndexTimer::K12_LN_BOMB},
+        {chart::K3,  IndexTimer::K13_LN_BOMB},
+        {chart::K4,  IndexTimer::K14_LN_BOMB},
+        {chart::K5,  IndexTimer::K15_LN_BOMB},
+        {chart::K6,  IndexTimer::K21_LN_BOMB},
+        {chart::K7,  IndexTimer::K22_LN_BOMB},
+        {chart::K8,  IndexTimer::K23_LN_BOMB},
+        {chart::K9,  IndexTimer::K24_LN_BOMB},
+        {chart::K10, IndexTimer::K25_LN_BOMB},
+        {chart::Sc2, IndexTimer::S2_LN_BOMB},
+    } };
+
+    inline static const NoteLaneTimerMap bombTimer7k = { {
+        {chart::Sc1, IndexTimer::S1_BOMB},
+        {chart::K1,  IndexTimer::K11_BOMB},
+        {chart::K2,  IndexTimer::K12_BOMB},
+        {chart::K3,  IndexTimer::K13_BOMB},
+        {chart::K4,  IndexTimer::K14_BOMB},
+        {chart::K5,  IndexTimer::K15_BOMB},
+        {chart::K6,  IndexTimer::K16_BOMB},
+        {chart::K7,  IndexTimer::K17_BOMB},
+        {chart::K8,  IndexTimer::K21_BOMB},
+        {chart::K9,  IndexTimer::K22_BOMB},
+        {chart::K10, IndexTimer::K23_BOMB},
+        {chart::K11, IndexTimer::K24_BOMB},
+        {chart::K12, IndexTimer::K25_BOMB},
+        {chart::K13, IndexTimer::K26_BOMB},
+        {chart::K14, IndexTimer::K27_BOMB},
+        {chart::Sc2, IndexTimer::S2_BOMB},
+    } };
 
     inline static const NoteLaneTimerMap bombTimer7kLN = { {
-        {chart::Sc1, eTimer::S1_LN_BOMB },
-        {chart::K1,  eTimer::K11_LN_BOMB},
-        {chart::K2,  eTimer::K12_LN_BOMB},
-        {chart::K3,  eTimer::K13_LN_BOMB},
-        {chart::K4,  eTimer::K14_LN_BOMB},
-        {chart::K5,  eTimer::K15_LN_BOMB},
-        {chart::K6,  eTimer::K16_LN_BOMB},
-        {chart::K7,  eTimer::K17_LN_BOMB},
-    } };
-
-    inline static const NoteLaneTimerMap bombTimer14k = { {
-        {chart::Sc1, eTimer::S1_BOMB},
-        {chart::K1,  eTimer::K11_BOMB},
-        {chart::K2,  eTimer::K12_BOMB},
-        {chart::K3,  eTimer::K13_BOMB},
-        {chart::K4,  eTimer::K14_BOMB},
-        {chart::K5,  eTimer::K15_BOMB},
-        {chart::K6,  eTimer::K16_BOMB},
-        {chart::K7,  eTimer::K17_BOMB},
-        {chart::K8,  eTimer::K21_BOMB},
-        {chart::K9,  eTimer::K22_BOMB},
-        {chart::K10, eTimer::K23_BOMB},
-        {chart::K11, eTimer::K24_BOMB},
-        {chart::K12, eTimer::K25_BOMB},
-        {chart::K13, eTimer::K26_BOMB},
-        {chart::K14, eTimer::K27_BOMB},
-        {chart::Sc2, eTimer::S2_BOMB},
-    } };
-
-    inline static const NoteLaneTimerMap bombTimer14kLN = { {
-        {chart::Sc1, eTimer::S1_LN_BOMB},
-        {chart::K1,  eTimer::K11_LN_BOMB},
-        {chart::K2,  eTimer::K12_LN_BOMB},
-        {chart::K3,  eTimer::K13_LN_BOMB},
-        {chart::K4,  eTimer::K14_LN_BOMB},
-        {chart::K5,  eTimer::K15_LN_BOMB},
-        {chart::K6,  eTimer::K16_LN_BOMB},
-        {chart::K7,  eTimer::K17_LN_BOMB},
-        {chart::K8,  eTimer::K21_LN_BOMB},
-        {chart::K9,  eTimer::K22_LN_BOMB},
-        {chart::K10, eTimer::K23_LN_BOMB},
-        {chart::K11, eTimer::K24_LN_BOMB},
-        {chart::K12, eTimer::K25_LN_BOMB},
-        {chart::K13, eTimer::K26_LN_BOMB},
-        {chart::K14, eTimer::K27_LN_BOMB},
-        {chart::Sc2, eTimer::S2_LN_BOMB},
+        {chart::Sc1, IndexTimer::S1_LN_BOMB},
+        {chart::K1,  IndexTimer::K11_LN_BOMB},
+        {chart::K2,  IndexTimer::K12_LN_BOMB},
+        {chart::K3,  IndexTimer::K13_LN_BOMB},
+        {chart::K4,  IndexTimer::K14_LN_BOMB},
+        {chart::K5,  IndexTimer::K15_LN_BOMB},
+        {chart::K6,  IndexTimer::K16_LN_BOMB},
+        {chart::K7,  IndexTimer::K17_LN_BOMB},
+        {chart::K8,  IndexTimer::K21_LN_BOMB},
+        {chart::K9,  IndexTimer::K22_LN_BOMB},
+        {chart::K10, IndexTimer::K23_LN_BOMB},
+        {chart::K11, IndexTimer::K24_LN_BOMB},
+        {chart::K12, IndexTimer::K25_LN_BOMB},
+        {chart::K13, IndexTimer::K26_LN_BOMB},
+        {chart::K14, IndexTimer::K27_LN_BOMB},
+        {chart::Sc2, IndexTimer::S2_LN_BOMB},
     } };
 
     inline static const NoteLaneTimerMap bombTimer9k = { {
-        {chart::K1,  eTimer::K11_BOMB},
-        {chart::K2,  eTimer::K12_BOMB},
-        {chart::K3,  eTimer::K13_BOMB},
-        {chart::K4,  eTimer::K14_BOMB},
-        {chart::K5,  eTimer::K15_BOMB},
-        {chart::K6,  eTimer::K16_BOMB},
-        {chart::K7,  eTimer::K17_BOMB},
-        {chart::K8,  eTimer::K18_BOMB},
-        {chart::K9,  eTimer::K19_BOMB},
+        {chart::K1,  IndexTimer::K11_BOMB},
+        {chart::K2,  IndexTimer::K12_BOMB},
+        {chart::K3,  IndexTimer::K13_BOMB},
+        {chart::K4,  IndexTimer::K14_BOMB},
+        {chart::K5,  IndexTimer::K15_BOMB},
+        {chart::K6,  IndexTimer::K16_BOMB},
+        {chart::K7,  IndexTimer::K17_BOMB},
+        {chart::K8,  IndexTimer::K18_BOMB},
+        {chart::K9,  IndexTimer::K19_BOMB},
     } };
 
     inline static const NoteLaneTimerMap bombTimer9kLN = { {
-        {chart::K1,  eTimer::K11_LN_BOMB},
-        {chart::K2,  eTimer::K12_LN_BOMB},
-        {chart::K3,  eTimer::K13_LN_BOMB},
-        {chart::K4,  eTimer::K14_LN_BOMB},
-        {chart::K5,  eTimer::K15_LN_BOMB},
-        {chart::K6,  eTimer::K16_LN_BOMB},
-        {chart::K7,  eTimer::K17_LN_BOMB},
-        {chart::K8,  eTimer::K18_LN_BOMB},
-        {chart::K9,  eTimer::K19_LN_BOMB},
+        {chart::K1,  IndexTimer::K11_LN_BOMB},
+        {chart::K2,  IndexTimer::K12_LN_BOMB},
+        {chart::K3,  IndexTimer::K13_LN_BOMB},
+        {chart::K4,  IndexTimer::K14_LN_BOMB},
+        {chart::K5,  IndexTimer::K15_LN_BOMB},
+        {chart::K6,  IndexTimer::K16_LN_BOMB},
+        {chart::K7,  IndexTimer::K17_LN_BOMB},
+        {chart::K8,  IndexTimer::K18_LN_BOMB},
+        {chart::K9,  IndexTimer::K19_LN_BOMB},
     } };
 
     // Judge area definitions.
@@ -168,18 +176,22 @@ public:
         AUTO,
         AUTO_2P,
         RIVAL,
+        MYBEST,
     };
 
     struct JudgeRes { judgeArea area = judgeArea::NOTHING; Time time; };
 
 protected:
-    PlaySide _side;
-    bool _k1P, _k2P;
-    JudgeDifficulty _judgeDifficulty;
-    GaugeType _gauge;
+    PlaySide _side = PlaySide::SINGLE;
+    bool _k1P = false, _k2P = false;
+    bool _judgeScratch = true;
+    JudgeDifficulty _judgeDifficulty = JudgeDifficulty::NORMAL;
+    GaugeType _gauge = GaugeType::GROOVE;
 
     std::map<JudgeType, double> _healthGain;
 
+    bool doJudge = true;
+    bool showJudge = true;
     const NoteLaneTimerMap* _bombTimerMap = nullptr;
     const NoteLaneTimerMap* _bombLNTimerMap = nullptr;
 
@@ -198,8 +210,8 @@ protected:
 
 public:
     RulesetBMS(
-        std::shared_ptr<vChartFormat> format,
-        std::shared_ptr<chart::vChart> chart,
+        std::shared_ptr<ChartFormatBase> format,
+        std::shared_ptr<ChartObjectBase> chart,
         eModGauge gauge,
         GameModeKeys keys,
         JudgeDifficulty difficulty = JudgeDifficulty::NORMAL,
@@ -229,15 +241,15 @@ public:
     virtual void update(const Time& t);
 public:
     //constexpr auto getJudge() const { return _count; }
-    void updateHit(const Time& t, chart::NoteLaneIndex ch, JudgeType judge, int slot);
-    void updateMiss(const Time& t, chart::NoteLaneIndex ch, JudgeType judge, int slot);
+    void updateHit(const Time& t, chart::NoteLaneIndex ch, JudgeType judge, int slot, bool force = false);
+    void updateMiss(const Time& t, chart::NoteLaneIndex ch, JudgeType judge, int slot, bool force = false);
     virtual bool isCleared() const { return !_isFailed && isFinished() && _basic.health >= _clearHealth; }
     virtual bool isFailed() const { return _isFailed; }
     virtual unsigned getCurrentMaxScore() const { return _basic.notesReached * 2; }
     virtual unsigned getMaxScore() const { return _chart->getNoteRegularCount() * 2 + _chart->getNoteLnCount() * 2; }
     unsigned getJudgeCount(JudgeType idx) const { return _judgeCount.find(idx) != _judgeCount.end() ? _judgeCount.at(idx) : 0; }
     GaugeType getGaugeType() const { return _gauge; }
-    virtual unsigned getMaxCombo() const { return _chart->getNoteTotalCount(); }
+    virtual unsigned getMaxCombo() const;
     virtual void fail();
     virtual void reset();
     virtual void updateGlobals();

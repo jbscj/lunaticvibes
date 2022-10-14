@@ -1,8 +1,10 @@
 #pragma once
-//#include <bitset>
-#include "buffered_global.h"
 
-enum class eSwitch: unsigned
+/*
+* These indices are dymanically converted to LR2skin indices.
+* You may modify the sequnce order freely.
+*/
+enum class IndexSwitch: unsigned
 {
     _TRUE = 0,           // should be initialized with true
 
@@ -54,6 +56,7 @@ enum class eSwitch: unsigned
     CHART_HAVE_STAGEFILE,
     CHART_HAVE_BANNER,
     CHART_HAVE_BACKBMP,
+    CHART_HAVE_REPLAY,
 
 	CHART_CAN_SAVE_SCORE,
 
@@ -137,8 +140,11 @@ enum class eSwitch: unsigned
         KEY_CONFIG_SLOT8,
         KEY_CONFIG_SLOT9,
 
-	P1_SETTING_SPEED,
-	P2_SETTING_SPEED,
+	P1_SETTING_LANECOVER,
+	P2_SETTING_LANECOVER,
+
+        P1_LANECOVER_ENABLED,
+        P2_LANECOVER_ENABLED,
 
         P1_LOCK_SPEED,
         P2_LOCK_SPEED,
@@ -148,24 +154,3 @@ enum class eSwitch: unsigned
     _TEST1,
     SWITCH_COUNT
 };
-
-inline buffered_global<eSwitch, bool, (size_t)eSwitch::SWITCH_COUNT> gSwitches;
-
-/*
-class gSwitches
-{
-protected:
-    constexpr gSwitches() : _data{ false }, _dataBuffer{ false } { _data[(size_t)eSwitch::FALSE] = true; }
-private:
-    static gSwitches _inst;
-    std::bitset<(size_t)eSwitch::SWITCH_COUNT> _data;
-    std::bitset<(size_t)eSwitch::SWITCH_COUNT> _dataBuffer;
-public:
-    static constexpr bool get(eSwitch n) { return _inst._data[(size_t)n] - _inst._data[0]; }
-    static constexpr void queue(eSwitch n, bool value) { _inst._dataBuffer[(size_t)n] = value; }
-    static constexpr void flush() { _inst._data = _inst._dataBuffer; }
-protected:
-    static constexpr void _set(eSwitch n, bool value) { _inst._data[(size_t)n] = _inst._dataBuffer[(size_t)n] = value; }
-};
-*/
-

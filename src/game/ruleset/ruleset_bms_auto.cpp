@@ -1,10 +1,11 @@
 #include "ruleset_bms_auto.h"
 #include "game/scene/scene.h"
 #include "game/scene/scene_context.h"
+#include "game/chart/chart_types.h"
 
 RulesetBMSAuto::RulesetBMSAuto(
-    std::shared_ptr<vChartFormat> format,
-    std::shared_ptr<chart::vChart> chart,
+    std::shared_ptr<ChartFormatBase> format,
+    std::shared_ptr<ChartObjectBase> chart,
     eModGauge gauge,
     GameModeKeys keys,
     JudgeDifficulty difficulty,
@@ -17,6 +18,18 @@ RulesetBMSAuto::RulesetBMSAuto(
 
     isPressingLN.fill(false);
 
+    switch (side)
+    {
+    case RulesetBMS::PlaySide::AUTO:
+        _judgeScratch = !(gPlayContext.mods[PLAYER_SLOT_PLAYER].assist_mask & PLAY_MOD_ASSIST_AUTOSCR);
+        break;
+
+    case RulesetBMS::PlaySide::AUTO_2P:
+    case RulesetBMS::PlaySide::RIVAL:
+        _judgeScratch = !(gPlayContext.mods[PLAYER_SLOT_TARGET].assist_mask & PLAY_MOD_ASSIST_AUTOSCR);
+        break;
+    }
+
     setTargetRate(1.0);
 }
 
@@ -25,6 +38,15 @@ void RulesetBMSAuto::setTargetRate(double rate)
     targetRate = rate;
     unsigned count = _chart->getNoteTotalCount();
     unsigned score = (unsigned)std::round(2 * count * rate);
+    if (!_judgeScratch)
+    {
+        auto pChart = std::dynamic_pointer_cast<ChartObjectBMS>(_chart);
+        if (pChart != nullptr)
+        {
+            count -= pChart->getScratchCount();
+            if (score > count * 2) score = count * 2;
+        }
+    }
 
     if (rate == 1.0)
     {
@@ -91,13 +113,27 @@ void RulesetBMSAuto::setTargetRate(double rate)
 
 void RulesetBMSAuto::update(const Time& t)
 {
-    auto rt = t - gTimers.get(eTimer::PLAY_START);
+    if (!_hasStartTime)
+        setStartTime(t);
+
+    auto rt = t - _startTime.norm();
     using namespace chart;
 
     auto updateSection = [&](Input::Pad begin, Input::Pad end, int side)
     {
         for (size_t k = begin; k <= end; ++k)
         {
+            bool scratch = false;
+            switch (k)
+            {
+            case Input::S1L:
+            case Input::S1R:
+            case Input::S2L:
+            case Input::S2R:
+                scratch = true;
+                break;
+            }
+
             JudgeRes j;
             NoteLaneIndex idx;
 
@@ -105,31 +141,37 @@ void RulesetBMSAuto::update(const Time& t)
             if (idx != NoteLaneIndex::_)
             {
                 auto itNote = _chart->incomingNote(NoteLaneCategory::Note, idx);
-                while (!_chart->isLastNote(NoteLaneCategory::Note, idx, itNote) && !itNote->hit && rt >= itNote->time)
+                while (!_chart->isLastNote(NoteLaneCategory::Note, idx, itNote) && !itNote->expired && rt >= itNote->time)
                 {
-                    updateHit(t, idx, noteJudges[judgeIndex++], side);
                     itNote->hit = true;
-                    _basic.notesExpired++;
+                    itNote->expired = true;
 
-                    if (_side == PlaySide::AUTO || _side == PlaySide::AUTO_2P)
+                    if (!scratch || _judgeScratch)
                     {
-                        gTimers.set(InputGamePressMapSingle[k].tm, t.norm());
-                        gTimers.set(InputGameReleaseMapSingle[k].tm, TIMER_NEVER);
-                        gSwitches.set(InputGamePressMapSingle[k].sw, true);
+                        updateHit(t, idx, noteJudges[judgeIndex++], side);
 
-                        if (k == Input::S1L || k == Input::S1R)
+                        if (_side == PlaySide::AUTO || _side == PlaySide::AUTO_2P)
                         {
-                            gTimers.set(eTimer::S1_DOWN, t.norm());
-                            gTimers.set(eTimer::S1_UP, TIMER_NEVER);
-                            gSwitches.set(eSwitch::S1_DOWN, true);
-                        }
-                        if (k == Input::S2L || k == Input::S2R)
-                        {
-                            gTimers.set(eTimer::S2_DOWN, t.norm());
-                            gTimers.set(eTimer::S2_UP, TIMER_NEVER);
-                            gSwitches.set(eSwitch::S2_DOWN, true);
+                            State::set(InputGamePressMap[k].tm, t.norm());
+                            State::set(InputGameReleaseMap[k].tm, TIMER_NEVER);
+                            State::set(InputGamePressMap[k].sw, true);
+
+                            if (k == Input::S1L || k == Input::S1R)
+                            {
+                                State::set(IndexTimer::S1_DOWN, t.norm());
+                                State::set(IndexTimer::S1_UP, TIMER_NEVER);
+                                State::set(IndexSwitch::S1_DOWN, true);
+                            }
+                            if (k == Input::S2L || k == Input::S2R)
+                            {
+                                State::set(IndexTimer::S2_DOWN, t.norm());
+                                State::set(IndexTimer::S2_UP, TIMER_NEVER);
+                                State::set(IndexSwitch::S2_DOWN, true);
+                            }
                         }
                     }
+
+                    _basic.notesExpired++;
                     itNote++;
                 }
             }
@@ -138,38 +180,42 @@ void RulesetBMSAuto::update(const Time& t)
             if (idx != NoteLaneIndex::_)
             {
                 auto itNote = _chart->incomingNote(NoteLaneCategory::LN, idx);
-                while (!_chart->isLastNote(NoteLaneCategory::LN, idx, itNote) && !itNote->hit)
+                while (!_chart->isLastNote(NoteLaneCategory::LN, idx, itNote) && !itNote->expired)
                 {
                     if (!(itNote->flags & Note::LN_TAIL))
                     {
                         const Time& hitTime = judgeTime[(size_t)_judgeDifficulty].BAD;
-                        if (!itNote->hit && rt >= itNote->time)
+                        if (!itNote->expired && rt >= itNote->time)
                         {
                             itNote->hit = true;
+                            itNote->expired = true;
 
-                            if (_side == PlaySide::AUTO || _side == PlaySide::AUTO_2P)
+                            if (!scratch || _judgeScratch)
                             {
-                                gTimers.set(InputGamePressMapSingle[k].tm, t.norm());
-                                gTimers.set(InputGameReleaseMapSingle[k].tm, TIMER_NEVER);
-                                gSwitches.set(InputGamePressMapSingle[k].sw, true);
-
-                                if (k == Input::S1L || k == Input::S1R)
+                                if (_side == PlaySide::AUTO || _side == PlaySide::AUTO_2P)
                                 {
-                                    gTimers.set(eTimer::S1_DOWN, t.norm());
-                                    gTimers.set(eTimer::S1_UP, TIMER_NEVER);
-                                    gSwitches.set(eSwitch::S1_DOWN, true);
-                                }
-                                if (k == Input::S2L || k == Input::S2R)
-                                {
-                                    gTimers.set(eTimer::S2_DOWN, t.norm());
-                                    gTimers.set(eTimer::S2_UP, TIMER_NEVER);
-                                    gSwitches.set(eSwitch::S2_DOWN, true);
-                                }
+                                    State::set(InputGamePressMap[k].tm, t.norm());
+                                    State::set(InputGameReleaseMap[k].tm, TIMER_NEVER);
+                                    State::set(InputGamePressMap[k].sw, true);
 
-                                if (_bombLNTimerMap != nullptr && _bombLNTimerMap->find(idx) != _bombLNTimerMap->end())
-                                    gTimers.set(_bombLNTimerMap->at(idx), t.norm());
+                                    if (k == Input::S1L || k == Input::S1R)
+                                    {
+                                        State::set(IndexTimer::S1_DOWN, t.norm());
+                                        State::set(IndexTimer::S1_UP, TIMER_NEVER);
+                                        State::set(IndexSwitch::S1_DOWN, true);
+                                    }
+                                    if (k == Input::S2L || k == Input::S2R)
+                                    {
+                                        State::set(IndexTimer::S2_DOWN, t.norm());
+                                        State::set(IndexTimer::S2_UP, TIMER_NEVER);
+                                        State::set(IndexSwitch::S2_DOWN, true);
+                                    }
 
-                                isPressingLN[k] = true;
+                                    if (_bombLNTimerMap != nullptr && _bombLNTimerMap->find(idx) != _bombLNTimerMap->end())
+                                        State::set(_bombLNTimerMap->at(idx), t.norm());
+
+                                    isPressingLN[k] = true;
+                                }
                             }
                         }
                     }
@@ -177,34 +223,39 @@ void RulesetBMSAuto::update(const Time& t)
                     {
                         if (rt >= itNote->time)
                         {
-                            updateHit(t, idx, noteJudges[judgeIndex++], side);
                             itNote->hit = true;
-                            _basic.notesExpired++;
+                            itNote->expired = true;
 
-                            if (_side == PlaySide::AUTO || _side == PlaySide::AUTO_2P)
+                            if (!scratch || _judgeScratch)
                             {
-                                gTimers.set(InputGamePressMapSingle[k].tm, TIMER_NEVER);
-                                gTimers.set(InputGameReleaseMapSingle[k].tm, t.norm());
-                                gSwitches.set(InputGameReleaseMapSingle[k].sw, false);
+                                updateHit(t, idx, noteJudges[judgeIndex++], side);
 
-                                if (k == Input::S1L || k == Input::S1R)
+                                if (_side == PlaySide::AUTO || _side == PlaySide::AUTO_2P)
                                 {
-                                    gTimers.set(eTimer::S1_DOWN, TIMER_NEVER);
-                                    gTimers.set(eTimer::S1_UP, t.norm());
-                                    gSwitches.set(eSwitch::S1_DOWN, false);
-                                }
-                                if (k == Input::S2L || k == Input::S2R)
-                                {
-                                    gTimers.set(eTimer::S2_DOWN, TIMER_NEVER);
-                                    gTimers.set(eTimer::S2_UP, t.norm());
-                                    gSwitches.set(eSwitch::S2_DOWN, false);
-                                }
+                                    State::set(InputGamePressMap[k].tm, TIMER_NEVER);
+                                    State::set(InputGameReleaseMap[k].tm, t.norm());
+                                    State::set(InputGameReleaseMap[k].sw, false);
 
-                                if (_bombLNTimerMap != nullptr && _bombLNTimerMap->find(idx) != _bombLNTimerMap->end())
-                                    gTimers.set(_bombLNTimerMap->at(idx), TIMER_NEVER);
+                                    if (k == Input::S1L || k == Input::S1R)
+                                    {
+                                        State::set(IndexTimer::S1_DOWN, TIMER_NEVER);
+                                        State::set(IndexTimer::S1_UP, t.norm());
+                                        State::set(IndexSwitch::S1_DOWN, false);
+                                    }
+                                    if (k == Input::S2L || k == Input::S2R)
+                                    {
+                                        State::set(IndexTimer::S2_DOWN, TIMER_NEVER);
+                                        State::set(IndexTimer::S2_UP, t.norm());
+                                        State::set(IndexSwitch::S2_DOWN, false);
+                                    }
 
-                                isPressingLN[k] = false;
+                                    if (_bombLNTimerMap != nullptr && _bombLNTimerMap->find(idx) != _bombLNTimerMap->end())
+                                        State::set(_bombLNTimerMap->at(idx), TIMER_NEVER);
+
+                                    isPressingLN[k] = false;
+                                }
                             }
+                            _basic.notesExpired++;
                         }
                     }
                     ++itNote;
@@ -215,9 +266,10 @@ void RulesetBMSAuto::update(const Time& t)
             if (idx != NoteLaneIndex::_)
             {
                 auto itNote = _chart->incomingNote(NoteLaneCategory::Invs, idx);
-                while (!_chart->isLastNote(NoteLaneCategory::Invs, idx, itNote) && !itNote->hit && rt >= itNote->time)
+                while (!_chart->isLastNote(NoteLaneCategory::Invs, idx, itNote) && !itNote->expired && rt >= itNote->time)
                 {
                     itNote->hit = true;
+                    itNote->expired = true;
                     itNote++;
                 }
             }
@@ -226,39 +278,43 @@ void RulesetBMSAuto::update(const Time& t)
             if (idx != NoteLaneIndex::_)
             {
                 auto itNote = _chart->incomingNote(NoteLaneCategory::Mine, idx);
-                while (!_chart->isLastNote(NoteLaneCategory::Mine, idx, itNote) && !itNote->hit && rt >= itNote->time)
+                while (!_chart->isLastNote(NoteLaneCategory::Mine, idx, itNote) && !itNote->expired && rt >= itNote->time)
                 {
                     itNote->hit = true;
+                    itNote->expired = true;
                     itNote++;
                 }
             }
 
-            if (_side == PlaySide::AUTO || _side == PlaySide::AUTO_2P)
+            if (!scratch || _judgeScratch)
             {
-                if (t.norm() - gTimers.get(InputGamePressMapSingle[k].tm) > 83 && !isPressingLN[k])
+                if (_side == PlaySide::AUTO || _side == PlaySide::AUTO_2P)
                 {
-                    gTimers.set(InputGamePressMapSingle[k].tm, TIMER_NEVER);
-                    gTimers.set(InputGameReleaseMapSingle[k].tm, t.norm());
-                    gSwitches.set(InputGameReleaseMapSingle[k].sw, false);
+                    if (t.norm() - State::get(InputGamePressMap[k].tm) > 83 && !isPressingLN[k])
+                    {
+                        State::set(InputGamePressMap[k].tm, TIMER_NEVER);
+                        State::set(InputGameReleaseMap[k].tm, t.norm());
+                        State::set(InputGameReleaseMap[k].sw, false);
 
-                    if (k == Input::S1L || k == Input::S1R)
-                    {
-                        gTimers.set(eTimer::S1_DOWN, TIMER_NEVER);
-                        gTimers.set(eTimer::S1_UP, t.norm());
-                        gSwitches.set(eSwitch::S1_DOWN, false);
-                    }
-                    if (k == Input::S2L || k == Input::S2R)
-                    {
-                        gTimers.set(eTimer::S2_DOWN, TIMER_NEVER);
-                        gTimers.set(eTimer::S2_UP, t.norm());
-                        gSwitches.set(eSwitch::S2_DOWN, false);
+                        if (k == Input::S1L || k == Input::S1R)
+                        {
+                            State::set(IndexTimer::S1_DOWN, TIMER_NEVER);
+                            State::set(IndexTimer::S1_UP, t.norm());
+                            State::set(IndexSwitch::S1_DOWN, false);
+                        }
+                        if (k == Input::S2L || k == Input::S2R)
+                        {
+                            State::set(IndexTimer::S2_DOWN, TIMER_NEVER);
+                            State::set(IndexTimer::S2_UP, t.norm());
+                            State::set(IndexSwitch::S2_DOWN, false);
+                        }
                     }
                 }
             }
         }
     };
-    updateSection(Input::S1L, Input::K1SPDDN, showJudge ? PLAYER_SLOT_1P : -1);
-    updateSection(Input::S2L, Input::K2SPDDN, showJudge ? PLAYER_SLOT_2P : -1);
+    updateSection(Input::S1L, Input::K19, showJudge ? PLAYER_SLOT_PLAYER : -1);
+    updateSection(Input::S2L, Input::K29, showJudge ? PLAYER_SLOT_TARGET : -1);
 
     unsigned max = _chart->getNoteTotalCount() * 2;
     _basic.total_acc = 100.0 * _basic.score2 / max;

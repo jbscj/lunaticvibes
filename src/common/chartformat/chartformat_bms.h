@@ -56,7 +56,7 @@ using namespace bms;
 class SceneSelect;
 class SongDB;
 
-class BMS_prop : public vChartFormat
+class ChartFormatBMSMeta : public ChartFormatBase
 {
 public:
     // File properties.
@@ -99,12 +99,12 @@ public:
     unsigned lastBarIdx = 0;
 
 public:
-    BMS_prop() { _type = eChartFormat::BMS; }
-    virtual ~BMS_prop() = default;
+    ChartFormatBMSMeta() { _type = eChartFormat::BMS; }
+    virtual ~ChartFormatBMSMeta() = default;
 };
 
 // the size of parsing result is kinda large..
-class BMS: public BMS_prop
+class ChartFormatBMS: public ChartFormatBMSMeta
 {
     friend class SceneSelect;
     friend class SongDB;
@@ -113,14 +113,14 @@ public:
     virtual int getExtendedProperty(const std::string& key, void* ret) override;
 
 public:
-    BMS();
-    BMS(const Path& absolutePath);
-    virtual ~BMS() = default;
+    ChartFormatBMS();
+    ChartFormatBMS(const Path& absolutePath, uint64_t randomSeed = 0);
+    virtual ~ChartFormatBMS() = default;
     std::string getError();
-    int initWithPathParam(const SongDB& db);
+    int initWithPathParam(const SongDB& db, uint64_t randomSeed = 0);
 
 protected:
-    int initWithFile(const Path& absolutePath);
+    int initWithFile(const Path& absolutePath, uint64_t randomSeed = 0);
 
 protected:
     ErrorCode errorCode = ErrorCode::OK;
@@ -128,45 +128,52 @@ protected:
 
 public:
     struct channel {
-        struct NoteParseValue { unsigned segment; unsigned value; };
+        struct NoteParseValue
+        {
+            unsigned segment;
+            unsigned value;
+
+            enum Flags
+            {
+                LN = 1 << 1,
+            };
+            unsigned flags;
+        };
         std::list<NoteParseValue> notes{};
         unsigned resolution = 1;
+
         unsigned relax(unsigned target_resolution);
         void sortNotes();
     };
     typedef std::array<std::string, MAXSAMPLEIDX + 1> FileIdxArray;
-    typedef std::array<channel, MAXBARIDX + 1> LaneArray;
+    typedef std::map<unsigned, channel> LaneMap;    // bar -> channel
     
 protected:
     // Lanes.
-    int strToLane36(channel&, const StringContent& str);
-    int strToLane36(channel&, StringContentView str);
+    int strToLane36(channel&, const StringContent& str, unsigned flags = 0);
+    int strToLane36(channel&, StringContentView str, unsigned flags = 0);
     int strToLane16(channel&, const StringContent& str);
     int strToLane16(channel&, StringContentView str);
 
-    std::vector<LaneArray> chBGM{};
-    LaneArray chStop{};
-    LaneArray chBPMChange{};
-    LaneArray chExBPMChange{};
-    LaneArray chBGABase{};
-    LaneArray chBGALayer{};
-    LaneArray chBGAPoor{};
+    std::map<unsigned, LaneMap> chBGM{}; // lane -> [bar -> channel]
+    LaneMap chStop{};
+    LaneMap chBPMChange{};
+    LaneMap chExBPMChange{};
+    LaneMap chBGABase{};
+    LaneMap chBGALayer{};
+    LaneMap chBGAPoor{};
     
-    struct PlayAreaLanes
-    {
-        static constexpr size_t LANE_COUNT = 10;
-        std::array<LaneArray, LANE_COUNT> lanes[2];
-    };
-    PlayAreaLanes chNotesRegular{};
-    PlayAreaLanes chNotesInvisible{};
-    PlayAreaLanes chNotesLN{};
-    PlayAreaLanes chMines{};
+    std::map<unsigned, LaneMap> chNotesRegular{};   // lane -> [bar -> channel]
+    std::map<unsigned, LaneMap> chNotesInvisible{};
+    std::map<unsigned, LaneMap> chNotesLN{};
+    std::map<unsigned, LaneMap> chMines{};
 
     std::pair<int, int> normalizeIndexesBME(int layer, int ch);
     std::pair<int, int> normalizeIndexesPMS(int layer, int ch);
 
 public:
     std::set<unsigned> lnobjSet;
+    bool haveLNchannels = false;
 
 public:
     // Measures related.
@@ -177,5 +184,5 @@ public:
 
 public:
     int getMode() const;
-    auto getLane(LaneCode, unsigned chIdx, unsigned measureIdx) const -> const decltype(chBGM[0][0])&;
+    auto getLane(LaneCode, unsigned chIdx, unsigned measureIdx) const -> const channel&;
 };

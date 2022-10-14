@@ -10,6 +10,7 @@ extern "C"
 #include "libavfilter/avfilter.h"
 #include "libavformat/avformat.h"
 #include "libavutil/avutil.h"
+#include "libavutil/frame.h"
 }
 
 #include "common/utils.h"
@@ -32,13 +33,14 @@ sVideo::~sVideo()
 	}
 }
 
-int sVideo::setVideo(const Path& file, bool loop)
+int sVideo::setVideo(const Path& file, double speed, bool loop)
 {
 	if (!fs::exists(file)) return -1;
 	if (!fs::is_regular_file(file)) return -2;
 
 	if (haveVideo) unsetVideo();
 	this->file = file;
+	this->speed = speed;
 	loop_playback = loop;
 
 	if (int ret = avformat_open_input(&pFormatCtx, file.u8string().c_str(), NULL, NULL); ret != 0)
@@ -192,6 +194,9 @@ void sVideo::decodeLoop()
 		{
 			if (!playing) return;
 
+			// Ignore packets from audio streams
+			if (pPacket->stream_index != videoIndex) continue;
+
 			avcodec_send_packet(pCodecCtx, pPacket);
 
 			int ret = avcodec_receive_frame(pCodecCtx, pFrame1);
@@ -213,7 +218,7 @@ void sVideo::decodeLoop()
 				}
 			}
 
-			if (pFrame1->pts >= 0)
+			if (pFrame1->best_effort_timestamp >= 0)
 			{
 				if (!(pFrame1->flags & AV_FRAME_FLAG_CORRUPT))
 				{
@@ -225,7 +230,7 @@ void sVideo::decodeLoop()
 				}
 
 				using namespace std::chrono;
-				auto frameTime_ms = long long(std::round(pFrame1->pts / tsps * 1000));	// TODO set playback speed
+				auto frameTime_ms = long long(std::round(pFrame1->best_effort_timestamp / tsps * 1000 / speed));
 				if (firstFrame)
 				{
 					firstFrame = false;
@@ -262,7 +267,7 @@ void sVideo::decodeLoop()
 					av_strerror(ret, buf, 128);
 					LOG_ERROR << "[Video] playback drain error: " << buf;
 				}
-				if (pFrame1->pts >= 0)
+				if (pFrame1->best_effort_timestamp >= 0)
 				{
 					std::unique_lock l(video_frame_mutex);
 

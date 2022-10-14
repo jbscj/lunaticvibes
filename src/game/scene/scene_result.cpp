@@ -1,10 +1,15 @@
 #include "scene_result.h"
 #include "scene_context.h"
+#include "common/types.h"
 #include "game/ruleset/ruleset.h"
 #include "game/ruleset/ruleset_bms.h"
 
 #include "game/sound/sound_mgr.h"
 #include "game/sound/sound_sample.h"
+
+#include "config/config_mgr.h"
+#include "game/generic_info.h"
+#include <boost/algorithm/string.hpp>
 
 SceneResult::SceneResult() : vScene(eMode::RESULT, 1000)
 {
@@ -12,12 +17,12 @@ SceneResult::SceneResult() : vScene(eMode::RESULT, 1000)
 
     _inputAvailable = INPUT_MASK_FUNC;
 
-    if (gPlayContext.chartObj[PLAYER_SLOT_1P] != nullptr)
+    if (gPlayContext.chartObj[PLAYER_SLOT_PLAYER] != nullptr)
     {
         _inputAvailable |= INPUT_MASK_1P;
     }
         
-    if (gPlayContext.chartObj[PLAYER_SLOT_2P] != nullptr)
+    if (gPlayContext.chartObj[PLAYER_SLOT_TARGET] != nullptr)
     {
         _inputAvailable |= INPUT_MASK_2P;
     }
@@ -25,82 +30,88 @@ SceneResult::SceneResult() : vScene(eMode::RESULT, 1000)
     _state = eResultState::DRAW;
 
     // set options
-    auto d1p = gPlayContext.ruleset[PLAYER_SLOT_1P]->getData();
-    gOptions.queue(eOption::RESULT_RANK_1P, Option::getRankType(d1p.total_acc));
-    gPlayContext.ruleset[PLAYER_SLOT_1P]->updateGlobals();
+    auto d1p = gPlayContext.ruleset[PLAYER_SLOT_PLAYER]->getData();
+    State::set(IndexOption::RESULT_RANK_1P, Option::getRankType(d1p.total_acc));
+    gPlayContext.ruleset[PLAYER_SLOT_PLAYER]->updateGlobals();
 
-    auto d2p = gPlayContext.ruleset[PLAYER_SLOT_2P]->getData();
-    gOptions.queue(eOption::RESULT_RANK_2P, Option::getRankType(d2p.total_acc));
-    gPlayContext.ruleset[PLAYER_SLOT_2P]->updateGlobals();
+    if (gPlayContext.ruleset[PLAYER_SLOT_TARGET])
+    {
+        auto d2p = gPlayContext.ruleset[PLAYER_SLOT_TARGET]->getData();
+        State::set(IndexOption::RESULT_RANK_2P, Option::getRankType(d2p.total_acc));
+        gPlayContext.ruleset[PLAYER_SLOT_TARGET]->updateGlobals();
 
-    gNumbers.queue(eNumber::PLAY_1P_EXSCORE_DIFF, d1p.score2 - d2p.score2);
-    gNumbers.queue(eNumber::PLAY_2P_EXSCORE_DIFF, d2p.score2 - d1p.score2);
+        State::set(IndexNumber::PLAY_1P_EXSCORE_DIFF, d1p.score2 - d2p.score2);
+        State::set(IndexNumber::PLAY_2P_EXSCORE_DIFF, d2p.score2 - d1p.score2);
+
+        if (d1p.score2 > d2p.score2)
+            State::set(IndexOption::RESULT_BATTLE_WIN_LOSE, 1);
+        else if (d1p.score2 < d2p.score2)
+            State::set(IndexOption::RESULT_BATTLE_WIN_LOSE, 2);
+        else
+            State::set(IndexOption::RESULT_BATTLE_WIN_LOSE, 0);
+    }
 
     // TODO set chart info (total notes, etc.)
-    auto chartLength = gPlayContext.chartObj[PLAYER_SLOT_1P]->getTotalLength().norm() / 1000;
-    gNumbers.queue(eNumber::PLAY_MIN, int(chartLength / 60));
-    gNumbers.queue(eNumber::PLAY_SEC, int(chartLength % 60));
-    gNumbers.queue(eNumber::PLAY_REMAIN_MIN, int(chartLength / 60));
-    gNumbers.queue(eNumber::PLAY_REMAIN_SEC, int(chartLength % 60));
+    auto chartLength = gPlayContext.chartObj[PLAYER_SLOT_PLAYER]->getTotalLength().norm() / 1000;
+    State::set(IndexNumber::PLAY_MIN, int(chartLength / 60));
+    State::set(IndexNumber::PLAY_SEC, int(chartLength % 60));
+    State::set(IndexNumber::PLAY_REMAIN_MIN, int(chartLength / 60));
+    State::set(IndexNumber::PLAY_REMAIN_SEC, int(chartLength % 60));
 
     // compare to db record
-    auto dp = gPlayContext.ruleset[PLAYER_SLOT_1P]->getData();
+    auto dp = gPlayContext.ruleset[PLAYER_SLOT_PLAYER]->getData();
     Option::e_rank_type nowRank = Option::getRankType(dp.total_acc);
     auto pScore = g_pScoreDB->getChartScoreBMS(gChartContext.hash);
     if (pScore)
     {
-        gNumbers.queue(eNumber::RESULT_RECORD_EX_NOW, (int)dp.score2);
-        gNumbers.queue(eNumber::RESULT_RECORD_EX_DIFF, (int)dp.score2 - pScore->exscore);
-        gNumbers.queue(eNumber::RESULT_RECORD_MAXCOMBO_NOW, (int)dp.maxCombo);
-        gNumbers.queue(eNumber::RESULT_RECORD_MAXCOMBO_DIFF, (int)dp.maxCombo - pScore->exscore);
-        gNumbers.queue(eNumber::RESULT_RECORD_BP_NOW, (int)dp.miss);
-        gNumbers.queue(eNumber::RESULT_RECORD_BP_DIFF, (int)dp.miss - pScore->bp);
+        State::set(IndexNumber::RESULT_RECORD_EX_NOW, (int)dp.score2);
+        State::set(IndexNumber::RESULT_RECORD_EX_DIFF, (int)dp.score2 - pScore->exscore);
+        State::set(IndexNumber::RESULT_RECORD_MAXCOMBO_NOW, (int)dp.maxCombo);
+        State::set(IndexNumber::RESULT_RECORD_MAXCOMBO_DIFF, (int)dp.maxCombo - pScore->exscore);
+        State::set(IndexNumber::RESULT_RECORD_BP_NOW, (int)dp.miss);
+        State::set(IndexNumber::RESULT_RECORD_BP_DIFF, (int)dp.miss - pScore->bp);
 
-        gNumbers.queue(eNumber::RESULT_MYBEST_EX, pScore->exscore);
-        gNumbers.queue(eNumber::RESULT_MYBEST_DIFF, dp.score2 - pScore->exscore);
-        gNumbers.queue(eNumber::RESULT_MYBEST_RATE, (int)std::floor(pScore->rate));
-        gNumbers.queue(eNumber::RESULT_MYBEST_RATE_DECIMAL2, (int)std::floor(pScore->rate * 100.0) % 100);
+        State::set(IndexNumber::RESULT_MYBEST_EX, pScore->exscore);
+        State::set(IndexNumber::RESULT_MYBEST_DIFF, dp.score2 - pScore->exscore);
+        State::set(IndexNumber::RESULT_MYBEST_RATE, (int)std::floor(pScore->rate));
+        State::set(IndexNumber::RESULT_MYBEST_RATE_DECIMAL2, (int)std::floor(pScore->rate * 100.0) % 100);
 
-        gNumbers.queue(eNumber::RESULT_RECORD_EX_BEFORE, pScore->exscore);
-        gNumbers.queue(eNumber::RESULT_RECORD_MAXCOMBO_BEFORE, pScore->maxcombo);
-        gNumbers.queue(eNumber::RESULT_RECORD_BP_BEFORE, pScore->bp);
-        gNumbers.queue(eNumber::RESULT_RECORD_MYBEST_RATE, (int)std::floor(pScore->rate));
-        gNumbers.queue(eNumber::RESULT_RECORD_MYBEST_RATE_DECIMAL2, (int)std::floor(pScore->rate * 100.0) % 100);
+        State::set(IndexNumber::RESULT_RECORD_EX_BEFORE, pScore->exscore);
+        State::set(IndexNumber::RESULT_RECORD_MAXCOMBO_BEFORE, pScore->maxcombo);
+        State::set(IndexNumber::RESULT_RECORD_BP_BEFORE, pScore->bp);
+        State::set(IndexNumber::RESULT_RECORD_MYBEST_RATE, (int)std::floor(pScore->rate));
+        State::set(IndexNumber::RESULT_RECORD_MYBEST_RATE_DECIMAL2, (int)std::floor(pScore->rate * 100.0) % 100);
 
         Option::e_rank_type recordRank = Option::getRankType(pScore->rate);
-        gOptions.queue(eOption::RESULT_MYBEST_RANK, recordRank);
-        //gOptions.queue(eOption::RESULT_UPDATED_RANK, (pScore->exscore > (int)dp.score2) ? recordRank : nowRank);
-        gOptions.queue(eOption::RESULT_UPDATED_RANK, nowRank);
+        State::set(IndexOption::RESULT_MYBEST_RANK, recordRank);
+        //State::set(IndexOption::RESULT_UPDATED_RANK, (pScore->exscore > (int)dp.score2) ? recordRank : nowRank);
+        State::set(IndexOption::RESULT_UPDATED_RANK, nowRank);
 
-        if (pScore->exscore < dp.score2)    gSwitches.queue(eSwitch::RESULT_UPDATED_SCORE, true);
-        if (pScore->maxcombo < dp.maxCombo) gSwitches.queue(eSwitch::RESULT_UPDATED_MAXCOMBO, true);
-        if (pScore->bp > dp.miss)           gSwitches.queue(eSwitch::RESULT_UPDATED_BP, true);
+        if (pScore->exscore < dp.score2)    State::set(IndexSwitch::RESULT_UPDATED_SCORE, true);
+        if (pScore->maxcombo < dp.maxCombo) State::set(IndexSwitch::RESULT_UPDATED_MAXCOMBO, true);
+        if (pScore->bp > dp.miss)           State::set(IndexSwitch::RESULT_UPDATED_BP, true);
     }
     else
     {
-        gNumbers.queue(eNumber::RESULT_RECORD_EX_NOW, (int)dp.score2);
-        gNumbers.queue(eNumber::RESULT_RECORD_EX_DIFF, (int)dp.score2);
-        gNumbers.queue(eNumber::RESULT_RECORD_MAXCOMBO_NOW, (int)dp.maxCombo);
-        gNumbers.queue(eNumber::RESULT_RECORD_MAXCOMBO_DIFF, (int)dp.maxCombo);
-        gNumbers.queue(eNumber::RESULT_RECORD_BP_NOW, (int)dp.miss);
-        gNumbers.queue(eNumber::RESULT_RECORD_BP_DIFF, (int)dp.miss);
+        State::set(IndexNumber::RESULT_RECORD_EX_NOW, (int)dp.score2);
+        State::set(IndexNumber::RESULT_RECORD_EX_DIFF, (int)dp.score2);
+        State::set(IndexNumber::RESULT_RECORD_MAXCOMBO_NOW, (int)dp.maxCombo);
+        State::set(IndexNumber::RESULT_RECORD_MAXCOMBO_DIFF, (int)dp.maxCombo);
+        State::set(IndexNumber::RESULT_RECORD_BP_NOW, (int)dp.miss);
+        State::set(IndexNumber::RESULT_RECORD_BP_DIFF, (int)dp.miss);
 
-        gOptions.queue(eOption::RESULT_MYBEST_RANK, Option::RANK_NONE);
-        gOptions.queue(eOption::RESULT_UPDATED_RANK, nowRank);
+        State::set(IndexOption::RESULT_MYBEST_RANK, Option::RANK_NONE);
+        State::set(IndexOption::RESULT_UPDATED_RANK, nowRank);
 
-        gSwitches.queue(eSwitch::RESULT_UPDATED_SCORE, true);
-        gSwitches.queue(eSwitch::RESULT_UPDATED_MAXCOMBO, true);
-        gSwitches.queue(eSwitch::RESULT_UPDATED_BP, true);
+        State::set(IndexSwitch::RESULT_UPDATED_SCORE, true);
+        State::set(IndexSwitch::RESULT_UPDATED_MAXCOMBO, true);
+        State::set(IndexSwitch::RESULT_UPDATED_BP, true);
     }
 
     // TODO compare to target
 
-    gNumbers.flush();
-    gOptions.flush();
-    gSwitches.flush();
 
-
-    bool cleared = gSwitches.get(eSwitch::RESULT_CLEAR);
+    bool cleared = State::get(IndexSwitch::RESULT_CLEAR);
 
     switch (gPlayContext.mode)
     {
@@ -108,8 +119,8 @@ SceneResult::SceneResult() : vScene(eMode::RESULT, 1000)
     case eMode::PLAY7_2:
     case eMode::PLAY9_2:
     {
-        auto d1p = gPlayContext.ruleset[PLAYER_SLOT_1P]->getData();
-        auto d2p = gPlayContext.ruleset[PLAYER_SLOT_2P]->getData();
+        auto d1p = gPlayContext.ruleset[PLAYER_SLOT_PLAYER]->getData();
+        auto d2p = gPlayContext.ruleset[PLAYER_SLOT_TARGET]->getData();
 
         // TODO WIN/LOSE
         /*
@@ -127,35 +138,38 @@ SceneResult::SceneResult() : vScene(eMode::RESULT, 1000)
         */
 
         // clear or failed?
-        //cleared = gPlayContext.ruleset[PLAYER_SLOT_1P]->isCleared() || gPlayContext.ruleset[PLAYER_SLOT_2P]->isCleared();
+        //cleared = gPlayContext.ruleset[PLAYER_SLOT_PLAYER]->isCleared() || gPlayContext.ruleset[PLAYER_SLOT_TARGET]->isCleared();
         break;
     }
 
     default:
-        //cleared = gPlayContext.ruleset[PLAYER_SLOT_1P]->isCleared();
+        //cleared = gPlayContext.ruleset[PLAYER_SLOT_PLAYER]->isCleared();
         break;
     }
 
     // Moved to play
-    //gSwitches.set(eSwitch::RESULT_CLEAR, cleared);
+    //State::set(IndexSwitch::RESULT_CLEAR, cleared);
 
     _pScoreOld = g_pScoreDB->getChartScoreBMS(gChartContext.hash);
 
-    auto& [saveScoreTmp, saveLampTmp] = getSaveScoreType();
-    saveScore = saveScoreTmp;
-    switch (saveLampTmp)
+    if (!gPlayContext.isReplay)
     {
-    case Option::e_lamp_type::LAMP_NOPLAY:      saveLamp = ScoreBMS::Lamp::NOPLAY; break;
-    case Option::e_lamp_type::LAMP_FAILED:      saveLamp = ScoreBMS::Lamp::FAILED; break;
-    case Option::e_lamp_type::LAMP_ASSIST:      saveLamp = ScoreBMS::Lamp::ASSIST; break;
-    case Option::e_lamp_type::LAMP_EASY:        saveLamp = ScoreBMS::Lamp::EASY; break;
-    case Option::e_lamp_type::LAMP_NORMAL:      saveLamp = ScoreBMS::Lamp::NORMAL; break;
-    case Option::e_lamp_type::LAMP_HARD:        saveLamp = ScoreBMS::Lamp::HARD; break;
-    case Option::e_lamp_type::LAMP_EXHARD:      saveLamp = ScoreBMS::Lamp::EXHARD; break;
-    case Option::e_lamp_type::LAMP_FULLCOMBO:   saveLamp = ScoreBMS::Lamp::FULLCOMBO; break;
-    case Option::e_lamp_type::LAMP_PERFECT:     saveLamp = ScoreBMS::Lamp::PERFECT; break;
-    case Option::e_lamp_type::LAMP_MAX:         saveLamp = ScoreBMS::Lamp::MAX; break;
-    default: assert(false); break;
+        auto& [saveScoreTmp, saveLampTmp] = getSaveScoreType();
+        saveScore = saveScoreTmp;
+        switch (saveLampTmp)
+        {
+        case Option::e_lamp_type::LAMP_NOPLAY:      saveLamp = ScoreBMS::Lamp::NOPLAY; break;
+        case Option::e_lamp_type::LAMP_FAILED:      saveLamp = ScoreBMS::Lamp::FAILED; break;
+        case Option::e_lamp_type::LAMP_ASSIST:      saveLamp = ScoreBMS::Lamp::ASSIST; break;
+        case Option::e_lamp_type::LAMP_EASY:        saveLamp = ScoreBMS::Lamp::EASY; break;
+        case Option::e_lamp_type::LAMP_NORMAL:      saveLamp = ScoreBMS::Lamp::NORMAL; break;
+        case Option::e_lamp_type::LAMP_HARD:        saveLamp = ScoreBMS::Lamp::HARD; break;
+        case Option::e_lamp_type::LAMP_EXHARD:      saveLamp = ScoreBMS::Lamp::EXHARD; break;
+        case Option::e_lamp_type::LAMP_FULLCOMBO:   saveLamp = ScoreBMS::Lamp::FULLCOMBO; break;
+        case Option::e_lamp_type::LAMP_PERFECT:     saveLamp = ScoreBMS::Lamp::PERFECT; break;
+        case Option::e_lamp_type::LAMP_MAX:         saveLamp = ScoreBMS::Lamp::MAX; break;
+        default: assert(false); break;
+        }
     }
 
     using namespace std::placeholders;
@@ -164,7 +178,7 @@ SceneResult::SceneResult() : vScene(eMode::RESULT, 1000)
     _input.register_r("SCENE_RELEASE", std::bind(&SceneResult::inputGameRelease, this, _1, _2));
 
     Time t;
-    gTimers.set(eTimer::RESULT_GRAPH_START, t.norm());
+    State::set(IndexTimer::RESULT_GRAPH_START, t.norm());
 
     SoundMgr::stopSysSamples();
     if (cleared) 
@@ -213,11 +227,11 @@ void SceneResult::_updateAsync()
 void SceneResult::updateDraw()
 {
     auto t = Time();
-    auto rt = t - gTimers.get(eTimer::SCENE_START);
+    auto rt = t - State::get(IndexTimer::SCENE_START);
 
     if (rt.norm() >= _skin->info.timeResultRank)
     {
-        gTimers.set(eTimer::RESULT_RANK_START, t.norm());
+        State::set(IndexTimer::RESULT_RANK_START, t.norm());
         // TODO play hit sound
         _state = eResultState::STOP;
         LOG_DEBUG << "[Result] State changed to STOP";
@@ -227,13 +241,13 @@ void SceneResult::updateDraw()
 void SceneResult::updateStop()
 {
     auto t = Time();
-    auto rt = t - gTimers.get(eTimer::SCENE_START);
+    auto rt = t - State::get(IndexTimer::SCENE_START);
 }
 
 void SceneResult::updateRecord()
 {
     auto t = Time();
-    auto rt = t - gTimers.get(eTimer::SCENE_START);
+    auto rt = t - State::get(IndexTimer::SCENE_START);
 
     // TODO sync score in online mode?
     if (true)
@@ -245,21 +259,37 @@ void SceneResult::updateRecord()
 void SceneResult::updateFadeout()
 {
     auto t = Time();
-    auto rt = t - gTimers.get(eTimer::SCENE_START);
-    auto ft = t - gTimers.get(eTimer::FADEOUT_BEGIN);
+    auto rt = t - State::get(IndexTimer::SCENE_START);
+    auto ft = t - State::get(IndexTimer::FADEOUT_BEGIN);
 
     if (ft >= _skin->info.timeOutro)
     {
         SoundMgr::stopNoteSamples();
 
+        std::string replayFileName = (boost::format("%04d%02d%02d-%02d%02d%02d.rep")
+            % State::get(IndexNumber::DATE_YEAR)
+            % State::get(IndexNumber::DATE_MON)
+            % State::get(IndexNumber::DATE_DAY)
+            % State::get(IndexNumber::DATE_HOUR)
+            % State::get(IndexNumber::DATE_MIN)
+            % State::get(IndexNumber::DATE_SEC)
+            ).str();
+        Path replayPath = ConfigMgr::Profile()->getPath() / "replay" / "chart" / gChartContext.hash.hexdigest() / replayFileName;
+
+        // save replay
+        if (saveScore)
+        {
+            gPlayContext.replayNew->saveFile(replayPath);
+        }
+
         // save score
         if (saveScore && !gChartContext.hash.empty())
         {
-            assert(gPlayContext.ruleset[PLAYER_SLOT_1P] != nullptr);
+            assert(gPlayContext.ruleset[PLAYER_SLOT_PLAYER] != nullptr);
             ScoreBMS score;
             auto& format = gChartContext.chartObj;
-            auto& chart = gPlayContext.chartObj[PLAYER_SLOT_1P];
-            auto& ruleset = gPlayContext.ruleset[PLAYER_SLOT_1P];
+            auto& chart = gPlayContext.chartObj[PLAYER_SLOT_PLAYER];
+            auto& ruleset = gPlayContext.ruleset[PLAYER_SLOT_PLAYER];
             auto& data = ruleset->getData();
             score.notes = chart->getNoteTotalCount();
             score.score = data.score;
@@ -270,6 +300,7 @@ void SceneResult::updateFadeout()
             score.playcount = _pScoreOld ? _pScoreOld->playcount + 1 : 1;
             auto isclear = ruleset->isCleared() ? 1 : 0;
             score.clearcount = _pScoreOld ? _pScoreOld->clearcount + isclear : isclear;
+            score.replayFileName = replayFileName;
 
             switch (format->type())
             {
@@ -331,7 +362,7 @@ void SceneResult::updateFadeout()
                 break;
             }
         }
-
+        
         // check retry
         if (_retryRequested && gPlayContext.canRetry)
         {
@@ -341,7 +372,9 @@ void SceneResult::updateFadeout()
         else
         {
             clearContextPlay();
-            gNextScene = gQuitOnFinish ? eScene::EXIT : eScene::SELECT;
+            gPlayContext.isAuto = false;
+            gPlayContext.isReplay = false;
+            gNextScene = gQuitOnFinish ? eScene::EXIT_TRANS : eScene::SELECT;
         }
     }
 }
@@ -351,14 +384,14 @@ void SceneResult::updateFadeout()
 // CALLBACK
 void SceneResult::inputGamePress(InputMask& m, const Time& t)
 {
-    if (t - gTimers.get(eTimer::SCENE_START) < _skin->info.timeIntro) return;
+    if (t - State::get(IndexTimer::SCENE_START) < _skin->info.timeIntro) return;
 
-    if ((_inputAvailable & m & INPUT_MASK_DECIDE).any())
+    if ((_inputAvailable & m & (INPUT_MASK_DECIDE | INPUT_MASK_CANCEL)).any() || m[Input::ESC])
     {
         switch (_state)
         {
         case eResultState::DRAW:
-            gTimers.set(eTimer::RESULT_RANK_START, t.norm());
+            State::set(IndexTimer::RESULT_RANK_START, t.norm());
             // TODO play hit sound
             _state = eResultState::STOP;
             LOG_DEBUG << "[Result] State changed to STOP";
@@ -367,7 +400,7 @@ void SceneResult::inputGamePress(InputMask& m, const Time& t)
         case eResultState::STOP:
             if (saveScore)
             {
-                gTimers.set(eTimer::RESULT_HIGHSCORE_START, t.norm());
+                State::set(IndexTimer::RESULT_HIGHSCORE_START, t.norm());
                 // TODO stop result sound
                 // TODO play record sound
                 _state = eResultState::RECORD;
@@ -375,8 +408,9 @@ void SceneResult::inputGamePress(InputMask& m, const Time& t)
             }
             else
             {
-                gTimers.set(eTimer::FADEOUT_BEGIN, t.norm());
+                State::set(IndexTimer::FADEOUT_BEGIN, t.norm());
                 _state = eResultState::FADEOUT;
+                SoundMgr::setSysVolume(0.0, 2000);
                 LOG_DEBUG << "[Result] State changed to FADEOUT";
             }
             break;
@@ -384,8 +418,9 @@ void SceneResult::inputGamePress(InputMask& m, const Time& t)
         case eResultState::RECORD:
             if (_scoreSyncFinished)
             {
-                gTimers.set(eTimer::FADEOUT_BEGIN, t.norm());
+                State::set(IndexTimer::FADEOUT_BEGIN, t.norm());
                 _state = eResultState::FADEOUT;
+                SoundMgr::setSysVolume(0.0, 2000);
                 LOG_DEBUG << "[Result] State changed to FADEOUT";
             }
             break;
@@ -402,7 +437,7 @@ void SceneResult::inputGamePress(InputMask& m, const Time& t)
 // CALLBACK
 void SceneResult::inputGameHold(InputMask& m, const Time& t)
 {
-    if (t - gTimers.get(eTimer::SCENE_START) < _skin->info.timeIntro) return;
+    if (t - State::get(IndexTimer::SCENE_START) < _skin->info.timeIntro) return;
 
     if (_state == eResultState::FADEOUT)
     {
@@ -415,5 +450,5 @@ void SceneResult::inputGameHold(InputMask& m, const Time& t)
 // CALLBACK
 void SceneResult::inputGameRelease(InputMask& m, const Time& t)
 {
-    if (t - gTimers.get(eTimer::SCENE_START) < _skin->info.timeIntro) return;
+    if (t - State::get(IndexTimer::SCENE_START) < _skin->info.timeIntro) return;
 }

@@ -18,84 +18,20 @@
 #include "imgui.h"
 
 #ifdef WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #pragma comment(lib, "winmm.lib")
 #include <consoleapi2.h>
+#include <ole2.h>
+#include <timeapi.h>
 #endif //WIN32
 
-#include <regex>
+#include <boost/format.hpp>
 
 bool gEventQuit;
 GenericInfoUpdater gGenericInfo{ 1 };
 
-void mainLoop()
-{
-    gGenericInfo.loopStart();
-
-    eScene currentScene = eScene::NOT_INIT;
-    gNextScene = eScene::SELECT;
-
-    pScene scene = nullptr;
-    while (!gEventQuit && currentScene != eScene::EXIT && gNextScene != eScene::EXIT)
-    {
-        // Evenet handling
-        event_handle();
-        if (gEventQuit)
-        {
-            gAppIsExiting = true;
-        }
-
-        // Scene change
-        if (currentScene != gNextScene)
-        {
-            if (scene)
-            {
-                scene->inputLoopEnd();
-                scene->loopEnd();
-            }
-
-            switch (gNextScene)
-            {
-            case eScene::SELECT: LOG_INFO << "Scene changed to SELECT"; break;
-            case eScene::DECIDE: LOG_INFO << "Scene changed to DECIDE"; break;
-            case eScene::PLAY:   LOG_INFO << "Scene changed to PLAY"; break;
-            case eScene::RETRY_TRANS:  LOG_INFO << "Scene changed to RETRY_TRANS"; break;
-            case eScene::RESULT: LOG_INFO << "Scene changed to RESULT"; break;
-            case eScene::KEYCONFIG: LOG_INFO << "Scene changed to KEYCONFIG"; break;
-            case eScene::CUSTOMIZE: LOG_INFO << "Scene changed to CUSTOMIZE"; break;
-            case eScene::EXIT:   LOG_INFO << "Scene changed to EXIT"; break;
-            default: break;
-            }
-
-            // Disable skin caching for now. dst options are changing all the time
-            SkinMgr::clean();
-
-            clearCustomDstOpt();
-			currentScene = gNextScene;
-            if (currentScene != eScene::EXIT)
-            {
-                scene = SceneMgr::get(currentScene);
-                assert(scene != nullptr);
-                scene->loopStart();
-                scene->inputLoopStart();
-            }
-        }
-
-        // draw
-        {
-            graphics_clear();
-            doMainThreadTask();
-            scene->update();
-            scene->draw();
-            graphics_flush();
-        }
-		++gFrameCount[0];
-    }
-    scene->inputLoopEnd();
-    scene->loopEnd();
-
-	gGenericInfo.loopEnd();
-}
+void mainLoop();
 
 // SDL_main
 int main(int argc, char* argv[])
@@ -145,36 +81,24 @@ int main(int argc, char* argv[])
     InputMgr::updateDeadzones();
 
     // reset globals
-    //gNumbers.setDefault(eNumber::ZERO, 0);
-    gSwitches.setDefault(eSwitch::_FALSE, false);
-    gSwitches.setDefault(eSwitch::_TRUE, true);
-    //gSliders.setDefault(eSlider::ZERO, 0);
-    //gTexts.setDefault(eText::INVALID, "");
-    gTimers.setDefault(eTimer::_NEVER, TIMER_NEVER);
-
-    gNumbers.reset();
-    gSwitches.reset();
-    gSliders.reset();
-    gTexts.reset();
-    gTimers.reset();
     ConfigMgr::setGlobals();
 
-    SoundMgr::setVolume(SampleChannel::MASTER, (float)gSliders.get(eSlider::VOLUME_MASTER));
-    SoundMgr::setVolume(SampleChannel::KEY, (float)gSliders.get(eSlider::VOLUME_KEY));
-    SoundMgr::setVolume(SampleChannel::BGM, (float)gSliders.get(eSlider::VOLUME_BGM));
+    SoundMgr::setVolume(SampleChannel::MASTER, (float)State::get(IndexSlider::VOLUME_MASTER));
+    SoundMgr::setVolume(SampleChannel::KEY, (float)State::get(IndexSlider::VOLUME_KEY));
+    SoundMgr::setVolume(SampleChannel::BGM, (float)State::get(IndexSlider::VOLUME_BGM));
 
-    if (gSwitches.get(eSwitch::SOUND_FX0))
-        SoundMgr::setDSP((DSPType)gOptions.get(eOption::SOUND_FX0), 0, (SampleChannel)gOptions.get(eOption::SOUND_TARGET_FX0), gSliders.get(eSlider::FX0_P1), gSliders.get(eSlider::FX0_P2));
-    if (gSwitches.get(eSwitch::SOUND_FX1))
-        SoundMgr::setDSP((DSPType)gOptions.get(eOption::SOUND_FX1), 1, (SampleChannel)gOptions.get(eOption::SOUND_TARGET_FX1), gSliders.get(eSlider::FX1_P1), gSliders.get(eSlider::FX1_P2));
-    if (gSwitches.get(eSwitch::SOUND_FX2))
-        SoundMgr::setDSP((DSPType)gOptions.get(eOption::SOUND_FX2), 2, (SampleChannel)gOptions.get(eOption::SOUND_TARGET_FX2), gSliders.get(eSlider::FX2_P1), gSliders.get(eSlider::FX2_P2));
+    if (State::get(IndexSwitch::SOUND_FX0))
+        SoundMgr::setDSP((DSPType)State::get(IndexOption::SOUND_FX0), 0, (SampleChannel)State::get(IndexOption::SOUND_TARGET_FX0), State::get(IndexSlider::FX0_P1), State::get(IndexSlider::FX0_P2));
+    if (State::get(IndexSwitch::SOUND_FX1))
+        SoundMgr::setDSP((DSPType)State::get(IndexOption::SOUND_FX1), 1, (SampleChannel)State::get(IndexOption::SOUND_TARGET_FX1), State::get(IndexSlider::FX1_P1), State::get(IndexSlider::FX1_P2));
+    if (State::get(IndexSwitch::SOUND_FX2))
+        SoundMgr::setDSP((DSPType)State::get(IndexOption::SOUND_FX2), 2, (SampleChannel)State::get(IndexOption::SOUND_TARGET_FX2), State::get(IndexSlider::FX2_P1), State::get(IndexSlider::FX2_P2));
 
-    if (gSwitches.get(eSwitch::SOUND_PITCH))
+    if (State::get(IndexSwitch::SOUND_PITCH))
     {
         static const double tick = std::pow(2, 1.0 / 12);
-        double f = std::pow(tick, gNumbers.get(eNumber::PITCH));
-        switch (gOptions.get(eOption::SOUND_PITCH_TYPE))
+        double f = std::pow(tick, State::get(IndexNumber::PITCH));
+        switch (State::get(IndexOption::SOUND_PITCH_TYPE))
         {
         case 0: // FREQUENCY
             SoundMgr::setFreqFactor(f);
@@ -195,60 +119,27 @@ int main(int argc, char* argv[])
         }
     }
 
-    if (gSwitches.get(eSwitch::SOUND_EQ))
+    if (State::get(IndexSwitch::SOUND_EQ))
     {
         for (int idx = 0; idx < 7; ++idx)
         {
-            int val = gNumbers.get(eNumber(idx + (int)eNumber::EQ0));
+            int val = State::get(IndexNumber(idx + (int)IndexNumber::EQ0));
             SoundMgr::setEQ((EQFreq)idx, val);
         }
     }
+
+    gSelectContext.scrollTimeLength = ConfigMgr::get("P", cfg::P_LIST_SCROLL_TIME_INITIAL, 300);
 
     // score db
     std::string scoreDBPath = (ConfigMgr::Profile()->getPath() / "score.db").u8string();
     g_pScoreDB = std::make_shared<ScoreDB>(scoreDBPath.c_str());
 
-    // initialize song list
+    // song db
     Path dbPath = Path(GAMEDATA_PATH) / "database";
     if (!fs::exists(dbPath)) fs::create_directories(dbPath);
     g_pSongDB = std::make_shared<SongDB>(dbPath / "song.db");
 
-    // get folders from config
-    auto folderList = ConfigMgr::General()->getFoldersPath();
-    for (auto& f : folderList)
-    {
-        g_pSongDB->addFolder(f);
-    }
-
-    SongListProperties rootFolderProp{
-        "",
-        ROOT_FOLDER_HASH,
-        "",
-        {},
-        {},
-        0
-    };
-    auto top = g_pSongDB->browse(ROOT_FOLDER_HASH, false);
-    for (size_t i = 0; i < top.getContentsCount(); ++i)
-    {
-        auto entry = top.getEntry(i);
-
-        bool deleted = true;
-        for (auto& f : folderList)
-        {
-            if (fs::equivalent(f, entry->getPath()))
-            {
-                deleted = false;
-                break;
-            }
-        }
-        if (!deleted)
-        {
-            g_pSongDB->browse(entry->md5, true);
-            rootFolderProp.dbBrowseEntries.push_back({ entry, nullptr });
-        }
-    }
-    gSelectContext.backtrace.push(rootFolderProp);
+    // load songs / tables at ScenePreSelect
 
     // arg parsing
     if (argc >= 2)
@@ -256,13 +147,17 @@ int main(int argc, char* argv[])
         gNextScene = eScene::PLAY;
         gQuitOnFinish = true;
 
-        std::shared_ptr<BMS> bms = std::make_shared<BMS>(argv[1]);
+        std::shared_ptr<ChartFormatBMS> bms = std::make_shared<ChartFormatBMS>(argv[1], std::time(NULL));
         gChartContext = ChartContextParams{
             argv[1],
             md5file(argv[1]),
             bms,
+            nullptr,
+
             false,
             false,
+            false,
+
             false,
 
             bms->title,
@@ -277,6 +172,10 @@ int main(int argc, char* argv[])
             bms->startBPM,
             bms->maxBPM,
         };
+    }
+    else
+    {
+        gNextScene = eScene::PRE_SELECT;
     }
 
     /*
@@ -325,4 +224,73 @@ int main(int argc, char* argv[])
 
     StopHandleMainThreadTask();
     return 0;
+}
+
+
+void mainLoop()
+{
+    gGenericInfo.loopStart();
+
+    eScene currentScene = eScene::NOT_INIT;
+
+    pScene scene = nullptr;
+    while (!gEventQuit && currentScene != eScene::EXIT && gNextScene != eScene::EXIT)
+    {
+        // Evenet handling
+        event_handle();
+        if (gEventQuit)
+        {
+            gAppIsExiting = true;
+        }
+
+        // Scene change
+        if (currentScene != gNextScene)
+        {
+            if (scene)
+            {
+                scene->inputLoopEnd();
+                scene->loopEnd();
+            }
+
+            switch (gNextScene)
+            {
+            case eScene::SELECT: LOG_INFO << "Scene changed to SELECT"; break;
+            case eScene::DECIDE: LOG_INFO << "Scene changed to DECIDE"; break;
+            case eScene::PLAY:   LOG_INFO << "Scene changed to PLAY"; break;
+            case eScene::RETRY_TRANS:  LOG_INFO << "Scene changed to RETRY_TRANS"; break;
+            case eScene::RESULT: LOG_INFO << "Scene changed to RESULT"; break;
+            case eScene::KEYCONFIG: LOG_INFO << "Scene changed to KEYCONFIG"; break;
+            case eScene::CUSTOMIZE: LOG_INFO << "Scene changed to CUSTOMIZE"; break;
+            case eScene::EXIT:   LOG_INFO << "Scene changed to EXIT"; break;
+            default: break;
+            }
+
+            // Disable skin caching for now. dst options are changing all the time
+            SkinMgr::clean();
+
+            clearCustomDstOpt();
+            currentScene = gNextScene;
+            if (currentScene != eScene::EXIT)
+            {
+                scene = SceneMgr::get(currentScene);
+                assert(scene != nullptr);
+                scene->loopStart();
+                scene->inputLoopStart();
+            }
+        }
+
+        // draw
+        {
+            graphics_clear();
+            doMainThreadTask();
+            scene->update();
+            scene->draw();
+            graphics_flush();
+        }
+        ++gFrameCount[0];
+    }
+    scene->inputLoopEnd();
+    scene->loopEnd();
+
+    gGenericInfo.loopEnd();
 }

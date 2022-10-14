@@ -2,7 +2,7 @@
 
 #include "common/encoding.h"
 
-SpriteImageText::SpriteImageText(std::vector<pTexture>& textures, CharMappingList& chrList, eText textInd, TextAlign align, unsigned height, int margin):
+SpriteImageText::SpriteImageText(std::vector<pTexture>& textures, CharMappingList* chrList, IndexText textInd, TextAlign align, unsigned height, int margin):
     SpriteText(nullptr, textInd, align), _textures(textures), _chrList(chrList), _height(height), _margin(margin)
 {
     _type = SpriteTypes::IMAGE_TEXT;
@@ -38,21 +38,21 @@ void SpriteImageText::setInputBindingText(std::string&& text)
 
     // save characters
     int x = 0;
-    int w = 0, h = 0;
+    int w = 0;
     _drawListOrig.clear();
     for (auto c : u32Text)
     {
-        if (_chrList.find(c) != _chrList.end() && _chrList[c].textureIdx < _textures.size())
+        if (_chrList->find(c) != _chrList->end())
         {
-            auto r = _chrList[c].textureRect;
-            _drawListOrig.push_back({ c, {x, 0, r.w, r.h} });
+            auto& r = _chrList->at(c).textureRect;
+            if (_chrList->at(c).textureIdx < _textures.size())
+                _drawListOrig.push_back({ c, {x, 0, r.w, r.h} });
             w = x + r.w;
             x += r.w + _margin;
-            h = std::max(h, r.h);
         }
     }
     //_drawList = _drawListOrig;
-    _drawRect = { 0, 0, w, h };
+    _drawRect = { 0, 0, w, (int)_height};
 }
 
 void SpriteImageText::updateTextRect()
@@ -129,7 +129,7 @@ bool SpriteImageText::update(const Time& t)
 {
     if (_draw = updateByKeyframes(t))
     {
-        setInputBindingText(gTexts.get(_textInd));
+        setInputBindingText(State::get(_textInd));
         if (_draw) updateTextRect();
     }
     return _draw;
@@ -141,8 +141,9 @@ void SpriteImageText::draw() const
     {
         for (auto [c, r] : _drawList)
         {
-            size_t idx = _chrList.at(c).textureIdx;
-            _textures[idx]->draw(_chrList.at(c).textureRect, r, _current.color, _current.blend, _current.filter, _current.angle);
+            auto& [idx, rect] = _chrList->at(c);
+            if (idx >= 0)
+                _textures[idx]->draw(rect, r, _current.color, _current.blend, _current.filter, _current.angle);
         }
     }
 }

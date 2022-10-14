@@ -26,11 +26,12 @@ void ConfigProfile::setDefaults() noexcept
 	set(P_HISPEED, 1.0);
     set(P_LOCK_SPEED, false);
 	set(P_SPEED_TYPE, P_SPEED_TYPE_NORMAL);
-	set(P_LOAD_BGA, true);
+    set(P_TARGET_TYPE, P_TARGET_TYPE_MYBEST);
+    set(P_BGA_TYPE, P_BGA_TYPE_ON);
+    set(P_BGA_SIZE, P_BGA_SIZE_NORMAL);
     set(P_LANECOVER_ENABLE, false);
     set(P_LANECOVER_TOP, 0);
     set(P_LANECOVER_BOTTOM, 0);
-    set(P_LIFT, 0);
     set(P_CHART_OP, P_CHART_OP_NORMAL);
     set(P_GAUGE_OP, P_GAUGE_OP_NORMAL);
     set(P_CHART_ASSIST_OP, P_CHART_ASSIST_OP_NONE);
@@ -44,7 +45,6 @@ void ConfigProfile::setDefaults() noexcept
     set(P_GHOST_COLOR, P_GHOST_COLOR_NORMAL);
     set(P_GHOST_TYPE, false);
     set(P_GHOST_TARGET, 50);
-    set(P_TARGET, false);
     set(P_GHOST_FS_TRIGGER, false);
     set(P_GHOST_FS_TYPE, P_GHOST_FS_TYPE_NORMAL);
     set(P_GHOST_FS_POS_X, 0);
@@ -52,7 +52,6 @@ void ConfigProfile::setDefaults() noexcept
     set(P_FILTER_KEYS, P_FILTER_KEYS_ALL);
     set(P_SORT_MODE, P_SORT_MODE_FOLDER);
     set(P_DIFFICULTY_FILTER, P_DIFFICULTY_FILTER_ALL);
-    set(P_BATTLE, false);
     set(P_FLIP, false);
     set(P_SCORE_GRAPH, false);
 

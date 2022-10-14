@@ -1,7 +1,10 @@
 #pragma once
-#include "buffered_global.h"
 
-enum class eOption : unsigned
+/*
+* These indices are dymanically converted to LR2skin indices.
+* You may modify the sequnce order freely.
+*/
+enum class IndexOption : unsigned
 {
     DEFAULT = 0,           // should be initialized with 0
 
@@ -36,26 +39,28 @@ enum class eOption : unsigned
     CHART_SAVE_LAMP_TYPE,    // 
 
     PLAY_SCENE_STAT,
-    PLAY_MODE,              // ePlayMode
+    PLAY_MODE,              // SP/DP/SP Battle/DB/SP-GB/DP-GB
     PLAY_KEYS,
-    PLAY_BGA_TYPE,
-    PLAY_GHOST_TYPE_1P,
+    PLAY_BGA_TYPE,          // OFF/ON/AUTOPLAY
+    PLAY_BGA_SIZE,          // NORMAL/EXTEND
+    PLAY_GHOST_TYPE_1P,     // OFF/A/B/C
     PLAY_GHOST_TYPE_2P,
     PLAY_GAUGE_TYPE_1P,     // GROOVE/HARD/SUDDEN/EASY/EXHARD(new)/ASSIST(new)
     PLAY_GAUGE_TYPE_2P,     // GROOVE/HARD/SUDDEN/EASY/EXHARD(new)/ASSIST(new)
     PLAY_RANDOM_TYPE_1P,
     PLAY_RANDOM_TYPE_2P,
-    PLAY_LANE_EFFECT_TYPE_1P,	// OFF/HIDDEN/SUDDEN/HID+SUD
-    PLAY_LANE_EFFECT_TYPE_2P,	// OFF/HIDDEN/SUDDEN/HID+SUD
-    PLAY_HSFIX_TYPE_1P,	//OFF/MAXBPM/MINBPM/AVERAGE/CONSTANT
-    PLAY_HSFIX_TYPE_2P,	//OFF/MAXBPM/MINBPM/AVERAGE/CONSTANT
-    PLAY_BATTLE_TYPE,	// OFF/BATTLE(VS HUMAN)/BATTLE(VS GHOST)/DOUBLE BATTLE/ONLINE BATTLE
+    PLAY_LANE_EFFECT_TYPE_1P,	// OFF/HID+/SUD+/SUD+&HID+/LIFT(new)/LIFT&SUD+(new)
+    PLAY_LANE_EFFECT_TYPE_2P,	// OFF/HID+/SUD+/SUD+&HID+/LIFT(new)/LIFT&SUD+(new)
+    PLAY_HSFIX_TYPE,	//OFF/MAXBPM/MINBPM/AVERAGE/CONSTANT
+    PLAY_BATTLE_TYPE,	// OFF/BATTLE/DB/SPtoDP,9to7/GhostBattle
+    PLAY_TARGET_TYPE,   // 0%/MYBEST/AAA/AA/A/DEFAULT/IRTOP/IRNEXT/IRAVERAGE
+
     PLAY_RANK_ESTIMATED_1P,
     PLAY_RANK_ESTIMATED_2P,
     PLAY_RANK_BORDER_1P,
     PLAY_RANK_BORDER_2P,
-    PLAY_ACCURACY_1P,
-    PLAY_ACCURACY_2P,
+    PLAY_HEALTH_1P,
+    PLAY_HEALTH_2P,
     PLAY_LAST_JUDGE_1P,
     PLAY_LAST_JUDGE_2P,
     PLAY_LAST_JUDGE_FASTSLOW_1P,   // 0:exact 1:fast 2:slow
@@ -68,8 +73,10 @@ enum class eOption : unsigned
     RESULT_MYBEST_RANK,
     RESULT_UPDATED_RANK,
     RESULT_CLEARED,
+    RESULT_BATTLE_WIN_LOSE,  // 0:DRAW 1:1PWIN 2:2PWIN
 
     SYS_WINDOWED,
+    SYS_VSYNC,
 
     _TEST1 = 200,
 
@@ -102,6 +109,14 @@ namespace Option
 		DIFF_ANOTHER,
 		DIFF_INSANE
 	};
+    constexpr char* s_select_diff[] = {
+        "ALL",
+        "BEGINNER",
+        "NORMAL",
+        "HYPER",
+        "ANOTHER",
+        "INSANE"
+    };
 
     enum e_select_sort {
         SORT_FOLDER,
@@ -109,6 +124,13 @@ namespace Option
         SORT_TITLE,
         SORT_CLEAR,
         SORT_RATE,
+    };
+    constexpr char* s_select_sort[] = {
+        "FOLDER",
+        "LEVEL",
+        "TITLE",
+        "CLEAR",
+        "INSANE"
     };
 
     enum e_key_config_mode {
@@ -127,6 +149,15 @@ namespace Option
 		SPLAY_FAILED,
 	};
 
+    enum e_play_mode {
+        PLAY_MODE_SINGLE,
+        PLAY_MODE_DOUBLE,
+        PLAY_MODE_BATTLE,
+        PLAY_MODE_DOUBLE_BATTLE,
+        PLAY_MODE_SP_GHOST_BATTLE,
+        PLAY_MODE_DP_GHOST_BATTLE,
+    };
+
     enum e_filter_keys {
         FILTER_KEYS_ALL,
         FILTER_KEYS_SINGLE,
@@ -136,6 +167,16 @@ namespace Option
         FILTER_KEYS_14,
         FILTER_KEYS_10,
         FILTER_KEYS_9,
+    };
+    constexpr char *s_filter_keys[] = {
+        "ALL KEYS",
+        "SINGLE",
+        "7KEYS",
+        "5KEYS",
+        "DOUBLE",
+        "14KEYS",
+        "10KEYS",
+        "9BUTTONS"
     };
 
     enum e_play_keys {
@@ -156,11 +197,48 @@ namespace Option
         GHOST_SIDE, // B
         GHOST_SIDE_BOTTOM // C
     };
+    constexpr char* s_play_ghost_mode[] = {
+        "OFF",
+        "TYPE A",
+        "TYPE B",
+        "TYPE C",
+    };
 
     enum e_bga_type {
         BGA_OFF,
+        BGA_ON,
+        BGA_AUTOPLAY,
+    };
+    constexpr char* s_bga_type[] = {
+        "OFF",
+        "ON",
+        "AUTOPLAY"
+    };
+
+    enum e_bga_size {
         BGA_NORMAL,
         BGA_EXTEND,
+    };
+    constexpr char* s_bga_size[] = {
+        "NORMAL",
+        "EXTEND",
+    };
+
+    enum e_lane_effect_type {
+        LANE_OFF,
+        LANE_HIDDEN,
+        LANE_SUDDEN,
+        LANE_SUDHID,
+        LANE_LIFT,
+        LANE_LIFTSUD,
+    };
+    constexpr char* s_lane_effect_type[] = {
+        "OFF",
+        "HIDDEN+",
+        "SUDDEN+",
+        "SUD+&HID+",
+        "LIFT",
+        "LIFT&SUD+",
     };
 
     enum e_speed_type {
@@ -171,12 +249,51 @@ namespace Option
         SPEED_FIX_AVG,
         SPEED_FIX_CONSTANT,
     };
+    constexpr char* s_speed_type[] = {
+        "OFF",
+        //"END",
+        "MIN FIX",
+        "MAX FIX",
+        "AVERAGE",
+        "CONSTANT",
+    };
 
     enum e_battle_type {
         BATTLE_OFF,
         BATTLE_LOCAL,
-        BATTLE_GHOST,
         BATTLE_DB,
+        BATTLE_SPtoDP_9to7, // not implemented
+        BATTLE_GHOST,
+    };
+    constexpr char* s_battle_type[] = {
+        "OFF",
+        "BATTLE",
+        "D-BATTLE",
+        "SP to DP",
+        "GHOST",
+    };
+
+    enum e_target_type {
+        TARGET_0,
+        TARGET_MYBEST,
+        TARGET_AAA,
+        TARGET_AA,
+        TARGET_A,
+        TARGET_DEFAULT,
+        TARGET_IR_TOP,
+        TARGET_IR_NEXT,
+        TARGET_IR_AVERAGE,
+    };
+    constexpr char* s_target_type[] = {
+        "NO TARGET",
+        "MY BEST",
+        "RANK AAA",
+        "RANK AA",
+        "RANK A",
+        "50%",
+        "IR TOP",
+        "IR NEXT",
+        "IR AVERAGE",
     };
 
     enum e_gauge_type{
@@ -187,6 +304,14 @@ namespace Option
         GAUGE_ASSIST,
         GAUGE_EXHARD,
     };
+    constexpr char* s_gauge_type[] = {
+        "NORMAL",
+        "HARD",
+        "DEATH",
+        "EASY",
+        "ASSIST",
+        "EXHARD",
+    };
 
     enum e_random_type {
         RAN_NORMAL,
@@ -195,6 +320,23 @@ namespace Option
         RAN_SRAN,
         RAN_HRAN,
         RAN_ALLSCR,
+    };
+    constexpr char* s_random_type[] = {
+        "NORMAL",
+        "MIRROR",
+        "RANDOM",
+        "S-RANDOM",
+        "H-RANDOM",
+        "ALL-SCR",
+    };
+
+    enum e_assist_type {
+        ASSIST_NONE,
+        ASSIST_AUTOSCR,
+    };
+    constexpr char* s_assist_type[] = {
+        "NONE",
+        "AUTO-SCR",
     };
 
     enum e_chart_difficulty {
@@ -245,32 +387,32 @@ namespace Option
         else                            return e_rank_type::RANK_NONE;
     }
 
-    enum e_acc_type {
-        ACC_0,  // 0~10
-        ACC_10, // 10~20
-        ACC_20, // 
-        ACC_30, //
-        ACC_40, //
-        ACC_50, //
-        ACC_60, //
-        ACC_70, //
-        ACC_80, //
-        ACC_90, //
-		ACC_100
+    enum e_health_range {
+        HEALTH_0,  // 0~10
+        HEALTH_10, // 10~20
+        HEALTH_20, // 
+        HEALTH_30, //
+        HEALTH_40, //
+        HEALTH_50, //
+        HEALTH_60, //
+        HEALTH_70, //
+        HEALTH_80, //
+        HEALTH_90, //
+		HEALTH_100
     };
-    constexpr e_acc_type getAccType(double rate)
+    constexpr e_health_range getHealthType(double health)
     {
-        if (rate >= 100.0)     return e_acc_type::ACC_100;
-        else if (rate >= 90.0) return e_acc_type::ACC_90;
-        else if (rate >= 80.0) return e_acc_type::ACC_80;
-        else if (rate >= 70.0) return e_acc_type::ACC_70;
-        else if (rate >= 60.0) return e_acc_type::ACC_60;
-        else if (rate >= 50.0) return e_acc_type::ACC_50;
-        else if (rate >= 40.0) return e_acc_type::ACC_40;
-        else if (rate >= 30.0) return e_acc_type::ACC_30;
-        else if (rate >= 20.0) return e_acc_type::ACC_20;
-        else if (rate >= 10.0) return e_acc_type::ACC_10;
-        else                   return e_acc_type::ACC_0;
+        if (health >= 100.0)     return e_health_range::HEALTH_100;
+        else if (health >= 90.0) return e_health_range::HEALTH_90;
+        else if (health >= 80.0) return e_health_range::HEALTH_80;
+        else if (health >= 70.0) return e_health_range::HEALTH_70;
+        else if (health >= 60.0) return e_health_range::HEALTH_60;
+        else if (health >= 50.0) return e_health_range::HEALTH_50;
+        else if (health >= 40.0) return e_health_range::HEALTH_40;
+        else if (health >= 30.0) return e_health_range::HEALTH_30;
+        else if (health >= 20.0) return e_health_range::HEALTH_20;
+        else if (health >= 10.0) return e_health_range::HEALTH_10;
+        else                     return e_health_range::HEALTH_0;
     }
 
     enum e_judge_diff {
@@ -333,8 +475,23 @@ namespace Option
         WIN_BORDERLESS,
         WIN_WINDOWED
     };
+    constexpr char* s_windowed[] = {
+        "FULLSCREEN",
+        "BORDERLESS",
+        "WINDOWED",
+    };
+
+    enum e_vsync_mode {
+        VSYNC_OFF,
+        VSYNC_ON,
+        VSYNC_ADAPTIVE
+    };
+    constexpr char* s_vsync_mode[] = {
+        "OFF",
+        "ON",
+        "ADAPTIVE",
+    };
 
 }
 
 
-inline buffered_global<eOption, unsigned, (size_t)eOption::OPTION_COUNT> gOptions;

@@ -1,43 +1,47 @@
 #pragma once
 #include <memory>
+#include <boost/format.hpp>
 #include "entry_folder.h"
 #include "common/chartformat/chartformat.h"
 
-class FolderSong : public vFolder
+// entry for individual song, e.g. jukebox/bms/L9
+class EntryFolderSong : public EntryFolderBase
 {
 public:
-    FolderSong() = delete;
-    FolderSong(HashMD5 md5, const Path& path, const StringContent& name = "", const StringContent& name2 = "") :
-        vFolder(eFolderType::SONG, md5, path)
+    EntryFolderSong() = delete;
+    EntryFolderSong(HashMD5 md5, const Path& path, const StringContent& name = "", const StringContent& name2 = "") :
+        EntryFolderBase(md5, path)
     {
+        _type = eEntryType::SONG;
         _name = name;
         _name2 = name2;
     }
 
 protected:
-    std::vector<std::shared_ptr<vChartFormat>> charts;
+    std::vector<std::shared_ptr<ChartFormatBase>> charts;
     size_t idx = 0;
 
 public:
-    std::shared_ptr<vChartFormat> getChart(size_t idx);
-    std::shared_ptr<vChartFormat> getCurrentChart();
+    std::shared_ptr<ChartFormatBase> getChart(size_t idx);
+    std::shared_ptr<ChartFormatBase> getCurrentChart();
     size_t incCurrentChart();
-    void pushChart(std::shared_ptr<vChartFormat> c);
+    void pushChart(std::shared_ptr<ChartFormatBase> c);
     virtual size_t getContentsCount() { return charts.size(); }
     virtual bool empty() { return charts.empty(); }
 };
 
-class EntryChart : public vEntry
+// entry for each charts of song, e.g. jukebox/bms/L9/kuso9_7.bme
+class EntryChart : public EntryBase
 {
 public:
-    std::shared_ptr<vChartFormat> _file;
+    std::shared_ptr<ChartFormatBase> _file;
 
     // extend info
     bool have_more = false;
 
 public:
-    EntryChart() = delete;
-    EntryChart(std::shared_ptr<vChartFormat> p): _file(p)
+    EntryChart() = default;
+    EntryChart(std::shared_ptr<ChartFormatBase> p): _file(p)
     {
         _type = eEntryType::CHART;
         md5 = _file->fileHash;
@@ -46,5 +50,22 @@ public:
 
         _addTime = _file->addTime;
     }
-    EntryChart(vChartFormat& f) : EntryChart(std::make_shared<vChartFormat>(f)) {}
+    EntryChart(ChartFormatBase& f) : EntryChart(std::make_shared<ChartFormatBase>(f)) {}
+};
+
+// entry for tables
+class EntryChartLink : public EntryChart
+{
+public:
+    std::string urlBase;
+    std::string urlChart;
+
+public:
+    EntryChartLink(const std::string& md5, const std::string& urlBase, const std::string urlChart)
+    {
+        _type = eEntryType::CHART_LINK;
+        this->md5 = md5;
+        this->urlBase = urlBase;
+        this->urlChart = urlChart;
+    }
 };

@@ -2,12 +2,24 @@
 #include "chart.h"
 #include "common/chartformat/chartformat_bms.h"
 
-namespace bms
+class ChartObjectBMS : public ChartObjectBase
 {
+public:
     // 32 -> 40 (9_7_L.bms, 2022-05-04)
-    const size_t BGM_LANE_COUNT = 40;
+    static inline const size_t BGM_LANE_COUNT = 40;
 
-    enum class eNoteExt: unsigned
+protected:
+    unsigned _noteCount_scratch = 0;
+    unsigned _noteCount_scratch_ln = 0;
+public:
+    unsigned constexpr getScratchCount() const { return _noteCount_scratch; }
+    unsigned constexpr getScratchLnCount() const { return _noteCount_scratch_ln; }
+
+public:
+    virtual chart::NoteLaneIndex getLaneFromKey(chart::NoteLaneCategory cat, Input::Pad input);
+    virtual std::vector<Input::Pad> getInputFromLane(size_t channel);
+
+    enum class eNoteExt : unsigned
     {
         BGABASE,
         BGALAYER,
@@ -17,23 +29,17 @@ namespace bms
 
         EXT_COUNT
     };
-};
-
-class chartBMS : public chart::vChart
-{
-public:
-    virtual chart::NoteLaneIndex getLaneFromKey(chart::NoteLaneCategory cat, Input::Pad input);
-    virtual std::vector<Input::Pad> getInputFromLane(size_t channel);
-    decltype(_specialNoteLists[0])& getBgaBase()  { return _specialNoteLists[(size_t)eNoteExt::BGABASE]; }
+    decltype(_specialNoteLists[0])& getBgaBase() { return _specialNoteLists[(size_t)eNoteExt::BGABASE]; }
     decltype(_specialNoteLists[0])& getBgaLayer() { return _specialNoteLists[(size_t)eNoteExt::BGALAYER]; }
-    decltype(_specialNoteLists[0])& getBgaPoor()  { return _specialNoteLists[(size_t)eNoteExt::BGAPOOR]; }
+    decltype(_specialNoteLists[0])& getBgaPoor() { return _specialNoteLists[(size_t)eNoteExt::BGAPOOR]; }
+
 public:
-    chartBMS() = delete;
-    chartBMS(int slot);
-    chartBMS(int slot, std::shared_ptr<BMS> bms);
-    chartBMS(int slot, const BMS& bms);
+    ChartObjectBMS() = delete;
+    ChartObjectBMS(int slot);
+    ChartObjectBMS(int slot, std::shared_ptr<ChartFormatBMS> bms);
+    ChartObjectBMS(int slot, const ChartFormatBMS& bms);
 protected:
-    void loadBMS(const BMS& bms);
+    void loadBMS(const ChartFormatBMS& bms);
 
 protected:
     decltype(_specialNoteLists.front().begin()) _currentStopNote;

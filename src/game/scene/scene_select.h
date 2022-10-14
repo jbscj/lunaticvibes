@@ -17,7 +17,8 @@ enum class eSelectState
     FADEOUT,
 };
 
-class vChartFormat;
+class ChartFormatBase;
+class SceneCustomize;
 class SceneSelect : public vScene
 {
 private:
@@ -31,10 +32,44 @@ private:
     bool isInVersionList = false;
 
     Time selectDownTimestamp;
+    Time navigateTimestamp;
 
+    // preview
+    std::shared_mutex previewMutex;
+    enum
+    {
+        PREVIEW_NONE,
+        PREVIEW_LOAD,
+        PREVIEW_PLAY,
+        PREVIEW_FINISH,
+    } previewState = PREVIEW_NONE;
+    bool previewStandalone = false; // true if chart has a preview sound track
+    long long previewStandaloneLength = 0;
+    std::shared_ptr<ChartFormatBase> previewChart = nullptr;
+    std::shared_ptr<ChartObjectBase> previewChartObj = nullptr;
+    std::shared_ptr<vRuleset> previewRuleset = nullptr;
+    Time previewStartTime;
+    std::array<size_t, 128> _bgmSampleIdxBuf{};
+    std::array<size_t, 128> _keySampleIdxBuf{};
+
+    // virtual Customize scene, customize option toggle in select scene support
+    static std::shared_ptr<SceneCustomize> _virtualSceneCustomize;
+
+    // smooth scrolling
     Time scrollButtonTimestamp;
     double scrollAccumulator = 0.0;
     double scrollAccumulatorAddUnit = 0.0;
+
+    // F8
+    bool refreshingSongList = false;
+
+    // 5+7 / 6+7
+    bool isHoldingK15 = false;
+    bool isHoldingK16 = false;
+    bool isHoldingK17 = false;
+    bool isHoldingK25 = false;
+    bool isHoldingK26 = false;
+    bool isHoldingK27 = false;
 
     // imgui
     bool imguiShow = false;
@@ -91,6 +126,12 @@ protected:
     void resetJukeboxText();
     void searchSong(const std::string& text);
 
+protected:
+    void updatePreview();
+    void postStopPreview();
+
+/// //////////////////////////////////////////////////////
+
 private:
     void _imguiInit();
 
@@ -101,6 +142,7 @@ private:
     // misc
     void _imguiRefreshProfileList();
     void _imguiRefreshFolderList();
+    void _imguiRefreshTableList();
     void _imguiRefreshVideoResolutionList();
     void _imguiRefreshVideoDisplayResolutionList();
     void _imguiCheckSettings();
@@ -109,6 +151,9 @@ private:
     bool _imguiAddFolder();
     bool _imguiDelFolder();
     bool _imguiBrowseFolder();
+    bool _imguiAddTable();
+    bool _imguiDelTable();
+    bool _imguiUpdateTable();
     bool _imguiApplyResolution();
     bool _imguiRefreshAudioDevices();
     bool _imguiApplyAudioSettings();
@@ -122,6 +167,12 @@ private:
     std::vector<const char*> imgui_folders_display;
     int imgui_folder_index;
 
+    bool imgui_table_popup = false;
+    char imgui_table_url_buf[256] = { 0 };
+    std::list<std::string> imgui_tables;
+    std::vector<const char*> imgui_tables_display;
+    int imgui_table_index;
+
     std::list<std::string> imgui_video_resolution;
     std::vector<const char*> imgui_video_resolution_display;
     int old_video_resolution_index, imgui_video_resolution_index;   // 0:480p 1:720p 2:1080p
@@ -133,7 +184,9 @@ private:
 
     int old_video_mode, imgui_video_mode;   // 0:windowed 1:fullscreen 2:borderless
     int imgui_video_ssLevel;
-    bool imgui_video_vsync;
+
+    int imgui_video_vsync_index;
+
     int imgui_video_maxFPS;
 
     std::list<std::pair<int, std::string>> imgui_audio_devices;

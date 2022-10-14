@@ -2,12 +2,7 @@
 
 #include "skin_lr2_button_callbacks.h"
 
-#include "game/data/timer.h"
-#include "game/data/number.h"
-#include "game/data/option.h"
-#include "game/data/slider.h"
-#include "game/data/switch.h"
-#include "game/data/text.h"
+#include "game/runtime/state.h"
 
 #include "game/sound/sound_mgr.h"
 #include "game/sound/sound_sample.h"
@@ -16,52 +11,54 @@
 
 #include "config/config_mgr.h"
 
+#include <boost/algorithm/string.hpp>
+
 namespace lr2skin::button
 {
 
 #pragma region helpers
 
-std::tuple<eOption, eSwitch, eNumber, eNumber, eSlider, eSlider, eOption, SampleChannel> disp_fx(int idx)
+std::tuple<IndexOption, IndexSwitch, IndexNumber, IndexNumber, IndexSlider, IndexSlider, IndexOption, SampleChannel> disp_fx(int idx)
 {
-    eOption op;
-    eSwitch sw;
-    eNumber num_p1, num_p2;
-    eSlider sli_p1, sli_p2;
-    eOption target;
+    IndexOption op;
+    IndexSwitch sw;
+    IndexNumber num_p1, num_p2;
+    IndexSlider sli_p1, sli_p2;
+    IndexOption target;
     switch (idx)
     {
     case 0: 
-        op = eOption::SOUND_FX0; 
-        sw = eSwitch::SOUND_FX0;
-        num_p1 = eNumber::FX0_P1;
-        num_p2 = eNumber::FX0_P2;
-        sli_p1 = eSlider::FX0_P1;
-        sli_p2 = eSlider::FX0_P2; 
-        target = eOption::SOUND_TARGET_FX0;
+        op = IndexOption::SOUND_FX0; 
+        sw = IndexSwitch::SOUND_FX0;
+        num_p1 = IndexNumber::FX0_P1;
+        num_p2 = IndexNumber::FX0_P2;
+        sli_p1 = IndexSlider::FX0_P1;
+        sli_p2 = IndexSlider::FX0_P2; 
+        target = IndexOption::SOUND_TARGET_FX0;
         break;
     case 1:
-        op = eOption::SOUND_FX1; 
-        sw = eSwitch::SOUND_FX1;
-        num_p1 = eNumber::FX1_P1;
-        num_p2 = eNumber::FX1_P2;
-        sli_p1 = eSlider::FX1_P1; 
-        sli_p2 = eSlider::FX1_P2; 
-        target = eOption::SOUND_TARGET_FX1;
+        op = IndexOption::SOUND_FX1; 
+        sw = IndexSwitch::SOUND_FX1;
+        num_p1 = IndexNumber::FX1_P1;
+        num_p2 = IndexNumber::FX1_P2;
+        sli_p1 = IndexSlider::FX1_P1; 
+        sli_p2 = IndexSlider::FX1_P2; 
+        target = IndexOption::SOUND_TARGET_FX1;
         break;
     case 2: 
-        op = eOption::SOUND_FX2;
-        sw = eSwitch::SOUND_FX2;
-        num_p1 = eNumber::FX2_P1;
-        num_p2 = eNumber::FX2_P2;
-        sli_p1 = eSlider::FX2_P1; 
-        sli_p2 = eSlider::FX2_P2; 
-        target = eOption::SOUND_TARGET_FX2;
+        op = IndexOption::SOUND_FX2;
+        sw = IndexSwitch::SOUND_FX2;
+        num_p1 = IndexNumber::FX2_P1;
+        num_p2 = IndexNumber::FX2_P2;
+        sli_p1 = IndexSlider::FX2_P1; 
+        sli_p2 = IndexSlider::FX2_P2; 
+        target = IndexOption::SOUND_TARGET_FX2;
         break;
     default: return {};
     }
 
     SampleChannel ch = SampleChannel::MASTER;
-    switch (gOptions.get(target))
+    switch (State::get(target))
     {
     case 1: ch = SampleChannel::KEY; break;
     case 2: ch = SampleChannel::BGM; break;
@@ -107,10 +104,10 @@ void update_fx(int type, int index, SampleChannel ch, float p1, float p2)
 
 void update_pitch()
 {
-    int p = static_cast<int>(std::round((gSliders.get(eSlider::PITCH) - 0.5) * 2 * 12));
+    int p = static_cast<int>(std::round((State::get(IndexSlider::PITCH) - 0.5) * 2 * 12));
     static const double tick = std::pow(2, 1.0 / 12);
     double f = std::pow(tick, p);
-    switch (gOptions.get(eOption::SOUND_PITCH_TYPE))
+    switch (State::get(IndexOption::SOUND_PITCH_TYPE))
     {
     case 0: // FREQUENCY
         SoundMgr::setFreqFactor(f);
@@ -131,17 +128,17 @@ void update_pitch()
     }
 }
 
-void number_change(eNumber type, int plus)
+void number_change(IndexNumber type, int plus)
 {
-    gNumbers.set(type, gNumbers.get(type) + plus);
+    State::set(type, State::get(type) + plus);
 
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
 }
 
-void number_change_clamp(eNumber type, int min, int max, int plus)
+void number_change_clamp(IndexNumber type, int min, int max, int plus)
 {
-    int val = std::clamp(gNumbers.get(type) + plus, min, max);
-    gNumbers.set(type, val);
+    int val = std::clamp(State::get(type) + plus, min, max);
+    State::set(type, val);
 
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
 }
@@ -154,37 +151,37 @@ void number_change_clamp(eNumber type, int min, int max, int plus)
 void panel_switch(int idx, int plus)
 {
     if (idx < 1 || idx > 9) return;
-    eSwitch panel = static_cast<eSwitch>(int(eSwitch::SELECT_PANEL1) - 1 + idx);
+    IndexSwitch panel = static_cast<IndexSwitch>(int(IndexSwitch::SELECT_PANEL1) - 1 + idx);
     Time t{};
 
     // close other panels
     for (int i = 1; i <= 9; ++i)
     {
         if (i == idx) continue;
-        eSwitch p = static_cast<eSwitch>(int(eSwitch::SELECT_PANEL1) - 1 + i);
-        if (gSwitches.get(p))
+        IndexSwitch p = static_cast<IndexSwitch>(int(IndexSwitch::SELECT_PANEL1) - 1 + i);
+        if (State::get(p))
         {
-            gSwitches.set(p, false);
-            gTimers.set(static_cast<eTimer>(int(eTimer::PANEL1_START) - 1 + i), TIMER_NEVER);
-            gTimers.set(static_cast<eTimer>(int(eTimer::PANEL1_END) - 1 + i), t.norm());
+            State::set(p, false);
+            State::set(static_cast<IndexTimer>(int(IndexTimer::PANEL1_START) - 1 + i), TIMER_NEVER);
+            State::set(static_cast<IndexTimer>(int(IndexTimer::PANEL1_END) - 1 + i), t.norm());
             SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CLOSE);
         }
     }
 
-    if (gSwitches.get(panel))
+    if (State::get(panel))
     {
         // close panel
-        gSwitches.set(panel, false);
-        gTimers.set(static_cast<eTimer>(int(eTimer::PANEL1_START) - 1 + idx), TIMER_NEVER);
-        gTimers.set(static_cast<eTimer>(int(eTimer::PANEL1_END) - 1 + idx), t.norm());
+        State::set(panel, false);
+        State::set(static_cast<IndexTimer>(int(IndexTimer::PANEL1_START) - 1 + idx), TIMER_NEVER);
+        State::set(static_cast<IndexTimer>(int(IndexTimer::PANEL1_END) - 1 + idx), t.norm());
         SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CLOSE);
     }
     else
     {
         // open panel
-        gSwitches.set(panel, true);
-        gTimers.set(static_cast<eTimer>(int(eTimer::PANEL1_START) - 1 + idx), t.norm());
-        gTimers.set(static_cast<eTimer>(int(eTimer::PANEL1_END) - 1 + idx), TIMER_NEVER);
+        State::set(panel, true);
+        State::set(static_cast<IndexTimer>(int(IndexTimer::PANEL1_START) - 1 + idx), t.norm());
+        State::set(static_cast<IndexTimer>(int(IndexTimer::PANEL1_END) - 1 + idx), TIMER_NEVER);
         SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_OPEN);
     }
 }
@@ -194,8 +191,8 @@ void select_difficulty_filter(int plus, int iterateCount)
 {
     if (iterateCount < 6)
     {
-        gOptions.set(eOption::SELECT_FILTER_DIFF, (gOptions.get(eOption::SELECT_FILTER_DIFF) + plus) % 6);
-        gSelectContext.filterDifficulty = gOptions.get(eOption::SELECT_FILTER_DIFF);
+        State::set(IndexOption::SELECT_FILTER_DIFF, (State::get(IndexOption::SELECT_FILTER_DIFF) + 6 + plus) % 6);
+        gSelectContext.filterDifficulty = State::get(IndexOption::SELECT_FILTER_DIFF);
 
         {
             std::unique_lock l(gSelectContext._mutex);
@@ -218,8 +215,10 @@ void select_keys_filter(int plus, int iterateCount)
 {
     if (iterateCount < 8)
     {
-        gOptions.set(eOption::SELECT_FILTER_KEYS, (gOptions.get(eOption::SELECT_FILTER_KEYS) + plus) % 8);
-        switch (gOptions.get(eOption::SELECT_FILTER_KEYS))
+        int val = (State::get(IndexOption::SELECT_FILTER_KEYS) + 8 + plus) % 8;
+        State::set(IndexOption::SELECT_FILTER_KEYS, val);
+
+        switch (val)
         {
         case Option::FILTER_KEYS_SINGLE: gSelectContext.filterKeys = 1; break;
         case Option::FILTER_KEYS_7:      gSelectContext.filterKeys = 7; break;
@@ -237,8 +236,23 @@ void select_keys_filter(int plus, int iterateCount)
             sortSongList();
             setBarInfo();
             setEntryInfo();
+
         }
-        if (gSelectContext.entries.empty())
+        if (!gSelectContext.entries.empty())
+        {
+            State::set(IndexOption::PLAY_BATTLE_TYPE, Option::BATTLE_OFF);
+            State::set(IndexText::BATTLE, "OFF");
+            State::set(IndexSwitch::PLAY_OPTION_DP_FLIP, false);
+            State::set(IndexText::FLIP, "OFF");
+
+            setPlayModeInfo();
+
+            auto& [score, lamp] = getSaveScoreType();
+            State::set(IndexSwitch::CHART_CAN_SAVE_SCORE, score);
+            State::set(IndexOption::CHART_SAVE_LAMP_TYPE, lamp);
+            State::set(IndexText::FILTER_KEYS, Option::s_filter_keys[val]);
+        }
+        else
         {
             return select_keys_filter(plus, iterateCount + 1);
         }
@@ -250,9 +264,9 @@ void select_keys_filter(int plus, int iterateCount)
 // 12
 void select_sort_type(int plus)
 {
-    gOptions.set(eOption::SELECT_SORT, (gOptions.get(eOption::SELECT_SORT) + plus) % 5);
+    State::set(IndexOption::SELECT_SORT, (State::get(IndexOption::SELECT_SORT) + 5 + plus) % 5);
 
-    switch (gOptions.get(eOption::SELECT_SORT))
+    switch (State::get(IndexOption::SELECT_SORT))
     {
     case Option::SORT_TITLE: gSelectContext.sort = SongListSort::TITLE; break;
     case Option::SORT_LEVEL: gSelectContext.sort = SongListSort::LEVEL; break;
@@ -306,15 +320,15 @@ void fx_type(int idx, int plus)
 
     // OFF/REVERB/DELAY/LOWPASS/HIGHPASS/FLANGER/CHORUS/DISTORTION/PITCH
     // pitch is unused, remaining 8 options
-    int val = (gOptions.get(op) + 8 + plus) % 8;
-    gOptions.set(op, val);
+    int val = (State::get(op) + 8 + plus) % 8;
+    State::set(op, val);
 
-    if (gSwitches.get(sw))
+    if (State::get(sw))
     {
-        float p1 = float(gSliders.get(sli_p1));
-        float p2 = float(gSliders.get(sli_p2));
-        gNumbers.set(num_p1, static_cast<int>(p1 * 100));
-        gNumbers.set(num_p2, static_cast<int>(p2 * 100));
+        float p1 = float(State::get(sli_p1));
+        float p2 = float(State::get(sli_p2));
+        State::set(num_p1, static_cast<int>(p1 * 100));
+        State::set(num_p2, static_cast<int>(p2 * 100));
         update_fx(val, idx, ch, p1, p2);
     }
     else
@@ -329,21 +343,21 @@ void fx_switch(int idx, int plus)
     if (idx < 0 || idx > 2) return;
     auto [op, sw, num_p1, num_p2, sli_p1, sli_p2, target, ch] = disp_fx(idx);
 
-    if (gSwitches.get(sw))
+    if (State::get(sw))
     {
         // button clicked, close fx
-        gSwitches.set(sw, false);
+        State::set(sw, false);
         update_fx(0, idx, ch, 0.f, 0.f);
     }
     else
     {
         // button clicked, open fx
-        gSwitches.set(sw, true);
-        float p1 = float(gSliders.get(sli_p1));
-        float p2 = float(gSliders.get(sli_p2));
-        gNumbers.set(num_p1, static_cast<int>(p1 * 100));
-        gNumbers.set(num_p2, static_cast<int>(p2 * 100));
-        update_fx(gOptions.get(op), idx, ch, p1, p2);
+        State::set(sw, true);
+        float p1 = float(State::get(sli_p1));
+        float p2 = float(State::get(sli_p2));
+        State::set(num_p1, static_cast<int>(p1 * 100));
+        State::set(num_p2, static_cast<int>(p2 * 100));
+        update_fx(State::get(op), idx, ch, p1, p2);
     }
 }
 
@@ -354,13 +368,13 @@ void fx_target(int idx, int plus)
     auto [op, sw, num_p1, num_p2, sli_p1, sli_p2, target, ch] = disp_fx(idx);
 
     // MASTER/KEY/BGM
-    int val = (gOptions.get(target) + 3 + plus) % 3;
-    gOptions.set(target, val);
+    int val = (State::get(target) + 3 + plus) % 3;
+    State::set(target, val);
 
-    if (gSwitches.get(sw))
+    if (State::get(sw))
     {
         // target is modified, thus we should get ch once again
-        switch (gOptions.get(target))
+        switch (State::get(target))
         {
         case 1: ch = SampleChannel::KEY; break;
         case 2: ch = SampleChannel::BGM; break;
@@ -368,21 +382,21 @@ void fx_target(int idx, int plus)
         default: break;
         }
 
-        float p1 = float(gSliders.get(sli_p1));
-        float p2 = float(gSliders.get(sli_p2));
-        gNumbers.set(num_p1, static_cast<int>(p1 * 100));
-        gNumbers.set(num_p2, static_cast<int>(p2 * 100));
-        update_fx(gOptions.get(op), idx, ch, p1, p2);
+        float p1 = float(State::get(sli_p1));
+        float p2 = float(State::get(sli_p2));
+        State::set(num_p1, static_cast<int>(p1 * 100));
+        State::set(num_p2, static_cast<int>(p2 * 100));
+        update_fx(State::get(op), idx, ch, p1, p2);
     }
 }
 
 // 29
 void eq_switch(int plus)
 {
-    if (gSwitches.get(eSwitch::SOUND_EQ))
+    if (State::get(IndexSwitch::SOUND_EQ))
     {
         // close
-        gSwitches.set(eSwitch::SOUND_EQ, false);
+        State::set(IndexSwitch::SOUND_EQ, false);
 
         for (int idx = 0; idx < 7; ++idx)
         {
@@ -392,11 +406,11 @@ void eq_switch(int plus)
     else
     {
         // open
-        gSwitches.set(eSwitch::SOUND_EQ, true);
+        State::set(IndexSwitch::SOUND_EQ, true);
 
         for (int idx = 0; idx < 7; ++idx)
         {
-            int val = gNumbers.get(eNumber(idx + (int)eNumber::EQ0));
+            int val = State::get(IndexNumber(idx + (int)IndexNumber::EQ0));
             SoundMgr::setEQ((EQFreq)idx, val);
         }
     }
@@ -405,161 +419,217 @@ void eq_switch(int plus)
 // 31
 void vol_switch(int plus)
 {
-    if (gSwitches.get(eSwitch::SOUND_VOLUME))
+    if (State::get(IndexSwitch::SOUND_VOLUME))
     {
         // close
-        gSwitches.set(eSwitch::SOUND_VOLUME, false);
+        State::set(IndexSwitch::SOUND_VOLUME, false);
+
+        SoundMgr::setVolume(SampleChannel::MASTER, 0.8);
+        SoundMgr::setVolume(SampleChannel::KEY, 1.0);
+        SoundMgr::setVolume(SampleChannel::BGM, 1.0);
     }
     else
     {
         // open
-        gSwitches.set(eSwitch::SOUND_VOLUME, true);
-    }
+        State::set(IndexSwitch::SOUND_VOLUME, true);
 
-    // TODO volume
+        SoundMgr::setVolume(SampleChannel::MASTER, State::get(IndexSlider::VOLUME_MASTER));
+        SoundMgr::setVolume(SampleChannel::KEY, State::get(IndexSlider::VOLUME_KEY));
+        SoundMgr::setVolume(SampleChannel::BGM, State::get(IndexSlider::VOLUME_BGM));
+    }
 }
 
 // 32
 void pitch_switch(int plus)
 {
-    if (gSwitches.get(eSwitch::SOUND_PITCH))
+    if (State::get(IndexSwitch::SOUND_PITCH))
     {
         // close
-        gSwitches.set(eSwitch::SOUND_PITCH, false);
+        State::set(IndexSwitch::SOUND_PITCH, false);
         SoundMgr::setFreqFactor(1.0);
+        gSelectContext.pitchSpeed = 1.0;
     }
     else
     {
         // open
-        gSwitches.set(eSwitch::SOUND_PITCH, true);
+        State::set(IndexSwitch::SOUND_PITCH, true);
         update_pitch();
     }
 
     auto& [score, lamp] = getSaveScoreType();
-    gSwitches.set(eSwitch::CHART_CAN_SAVE_SCORE, score);
-    gOptions.set(eOption::CHART_SAVE_LAMP_TYPE, lamp);
+    State::set(IndexSwitch::CHART_CAN_SAVE_SCORE, score);
+    State::set(IndexOption::CHART_SAVE_LAMP_TYPE, lamp);
 }
 
 // 33
 void pitch_type(int plus)
 {
     // FREQENCY/PITCH/SPEED
-    int val = (gOptions.get(eOption::SOUND_PITCH_TYPE) + 3 + plus) % 3;
-    gOptions.set(eOption::SOUND_PITCH_TYPE, val);
+    int val = (State::get(IndexOption::SOUND_PITCH_TYPE) + 3 + plus) % 3;
+    State::set(IndexOption::SOUND_PITCH_TYPE, val);
 
-    if (gSwitches.get(eSwitch::SOUND_PITCH))
+    if (State::get(IndexSwitch::SOUND_PITCH))
     {
-        int p = static_cast<int>(std::round((gSliders.get(eSlider::PITCH) - 0.5) * 2 * 12));
-        gNumbers.set(eNumber::PITCH, p);
+        int p = static_cast<int>(std::round((State::get(IndexSlider::PITCH) - 0.5) * 2 * 12));
+        State::set(IndexNumber::PITCH, p);
         update_pitch();
     }
 
     auto& [score, lamp] = getSaveScoreType();
-    gSwitches.set(eSwitch::CHART_CAN_SAVE_SCORE, score);
-    gOptions.set(eOption::CHART_SAVE_LAMP_TYPE, lamp);
+    State::set(IndexSwitch::CHART_CAN_SAVE_SCORE, score);
+    State::set(IndexOption::CHART_SAVE_LAMP_TYPE, lamp);
 }
 
 // 40, 41
 void gauge_type(int player, int plus)
 {
     int slot = 0;
-    eOption op;
-    eText tx;
+    IndexOption op;
+    IndexText tx;
     switch (player)
     {
-    case 0: slot = PLAYER_SLOT_1P; op = eOption::PLAY_GAUGE_TYPE_1P; tx = eText::GAUGE_1P; break;
-    case 1: slot = PLAYER_SLOT_2P; op = eOption::PLAY_GAUGE_TYPE_2P; tx = eText::GAUGE_2P; break;
+    case 0: slot = PLAYER_SLOT_PLAYER; op = IndexOption::PLAY_GAUGE_TYPE_1P; tx = IndexText::GAUGE_1P; break;
+    case 1: slot = PLAYER_SLOT_TARGET; op = IndexOption::PLAY_GAUGE_TYPE_2P; tx = IndexText::GAUGE_2P; break;
     default: return;
     }
 
     // eModGauge
-    int val = (gOptions.get(op) + plus) % 4;
-    gOptions.set(op, val);
-    switch (val)
-    {
-    case 0: gTexts.set(tx, "NORMAL"); break;
-    case 1: gTexts.set(tx, "HARD"); break;
-    case 2: gTexts.set(tx, "DEATH"); break;
-    case 3: gTexts.set(tx, "EASY"); break;
-    //case 4: gTexts.set(tx, "P-ATTACK"); break;
-    //case 5: gTexts.set(tx, "G-ATTACK"); break;
-    //case 6: gTexts.set(tx, "ASSIST-E"); break;
-    //case 7: break;
-    default: break;
-    }
+    int val = (State::get(op) + 4 + plus) % 4;
+    State::set(op, val);
+    State::set(tx, Option::s_gauge_type[val]);
 
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
+
+    auto& [score, lamp] = getSaveScoreType();
+    State::set(IndexSwitch::CHART_CAN_SAVE_SCORE, score);
+    State::set(IndexOption::CHART_SAVE_LAMP_TYPE, lamp);
 }
 
 // 42, 43
 void random_type(int player, int plus)
 {
     int slot = 0;
-    eOption op;
-    eText tx;
+    IndexOption op;
+    IndexText tx;
     switch (player)
     {
-    case 0: slot = PLAYER_SLOT_1P; op = eOption::PLAY_RANDOM_TYPE_1P; tx = eText::RANDOM_1P; break;
-    case 1: slot = PLAYER_SLOT_2P; op = eOption::PLAY_RANDOM_TYPE_2P; tx = eText::RANDOM_2P; break;
+    case 0: slot = PLAYER_SLOT_PLAYER; op = IndexOption::PLAY_RANDOM_TYPE_1P; tx = IndexText::RANDOM_1P; break;
+    case 1: slot = PLAYER_SLOT_TARGET; op = IndexOption::PLAY_RANDOM_TYPE_2P; tx = IndexText::RANDOM_2P; break;
     default: return;
     }
 
-    // eModChart
-    int val = (gOptions.get(op) + 6 + plus) % 6;
-    gOptions.set(op, val);
-    switch (val)
-    {
-    case 0: gPlayContext.mods[slot].chart = eModChart::NONE;    gTexts.set(tx, "NORMAL");   break;
-    case 1: gPlayContext.mods[slot].chart = eModChart::MIRROR;  gTexts.set(tx, "MIRROR");   break;
-    case 2: gPlayContext.mods[slot].chart = eModChart::RANDOM;  gTexts.set(tx, "RANDOM");   break;
-    case 3: gPlayContext.mods[slot].chart = eModChart::SRAN;    gTexts.set(tx, "S-RANDOM"); break;
-    case 4: gPlayContext.mods[slot].chart = eModChart::HRAN;    gTexts.set(tx, "H-RANDOM"); break;
-    case 5: gPlayContext.mods[slot].chart = eModChart::ALLSCR;  gTexts.set(tx, "ALL-SCR");  break;
-    default: break;
-    }
+    // eModRandom
+    int val = (State::get(op) + 6 + plus) % 6;
+    State::set(op, val);
+    State::set(tx, Option::s_random_type[val]);
 
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
 
     auto& [score, lamp] = getSaveScoreType();
-    gSwitches.set(eSwitch::CHART_CAN_SAVE_SCORE, score);
-    gOptions.set(eOption::CHART_SAVE_LAMP_TYPE, lamp);
+    State::set(IndexSwitch::CHART_CAN_SAVE_SCORE, score);
+    State::set(IndexOption::CHART_SAVE_LAMP_TYPE, lamp);
 }
 
 // 44, 45
 void autoscr(int player, int plus)
 {
     int slot = 0;
-    eSwitch sw;
-    eText tx;
+    IndexSwitch sw;
+    IndexText tx;
     switch (player)
     {
-    case 0: slot = PLAYER_SLOT_1P; sw = eSwitch::PLAY_OPTION_AUTOSCR_1P; tx = eText::ASSIST_1P; break;
-    case 1: slot = PLAYER_SLOT_2P; sw = eSwitch::PLAY_OPTION_AUTOSCR_2P; tx = eText::ASSIST_2P; break;
+    case 0: slot = PLAYER_SLOT_PLAYER; sw = IndexSwitch::PLAY_OPTION_AUTOSCR_1P; tx = IndexText::ASSIST_1P; break;
+    case 1: slot = PLAYER_SLOT_TARGET; sw = IndexSwitch::PLAY_OPTION_AUTOSCR_2P; tx = IndexText::ASSIST_2P; break;
     default: return;
     }
 
-    // eModChart
-    bool val = gSwitches.get(sw);
-    gSwitches.set(sw, !val);
-    gTexts.set(tx, (!val) ? "AUTO-SCR" : "NONE");
+    // eModRandom
+    bool val = State::get(sw);
+    if (plus % 2) val = !val;
+    State::set(sw, val);
+    State::set(tx, Option::s_assist_type[(int)val]);
 
-    SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
+    if (plus != 0)
+    {
+        if (State::get(IndexOption::PLAY_MODE) != Option::PLAY_MODE_BATTLE)
+        {
+            if (slot == PLAYER_SLOT_PLAYER)
+            {
+                State::set(IndexSwitch::PLAY_OPTION_AUTOSCR_2P, val);
+                autoscr(PLAYER_SLOT_TARGET, 0);
+            }
+            else
+            {
+                State::set(IndexSwitch::PLAY_OPTION_AUTOSCR_1P, val);
+                autoscr(PLAYER_SLOT_PLAYER, 0);
+            }
+        }
 
-    auto& [score, lamp] = getSaveScoreType();
-    gSwitches.set(eSwitch::CHART_CAN_SAVE_SCORE, score);
-    gOptions.set(eOption::CHART_SAVE_LAMP_TYPE, lamp);
+        SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
+
+        auto& [score, lamp] = getSaveScoreType();
+        State::set(IndexSwitch::CHART_CAN_SAVE_SCORE, score);
+        State::set(IndexOption::CHART_SAVE_LAMP_TYPE, lamp);
+    }
 }
 
 // 46
 void shutter(int plus)
 {
-
+    // fix to ON
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
+}
+
+// 50, 51
+void lane_effect(int player, int plus)
+{
+    int slot = 0;
+    IndexOption op;
+    IndexText tx;
+    switch (player)
+    {
+    case 0: slot = PLAYER_SLOT_PLAYER; op = IndexOption::PLAY_LANE_EFFECT_TYPE_1P; tx = IndexText::EFFECT_1P; break;
+    case 1: slot = PLAYER_SLOT_TARGET; op = IndexOption::PLAY_LANE_EFFECT_TYPE_2P; tx = IndexText::EFFECT_2P; break;
+    default: return;
+    }
+
+    // 
+    int val = (State::get(op) + 6 + plus) % 6;
+    State::set(op, val);
+    State::set(tx, Option::s_lane_effect_type[val]);
+
+    if (plus != 0)
+    {
+        if (State::get(IndexOption::PLAY_MODE) != Option::PLAY_MODE_BATTLE)
+        {
+            if (slot == PLAYER_SLOT_PLAYER)
+            {
+                State::set(IndexOption::PLAY_LANE_EFFECT_TYPE_2P, val);
+                lane_effect(PLAYER_SLOT_TARGET, 0);
+            }
+            else
+            {
+                State::set(IndexOption::PLAY_LANE_EFFECT_TYPE_1P, val);
+                lane_effect(PLAYER_SLOT_PLAYER, 0);
+            }
+        }
+
+        SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
+    }
 }
 
 // 54
 void flip(int plus)
 {
+    bool val = false;
+    auto gamemode = State::get(IndexOption::PLAY_MODE);
+    if (gamemode == Option::PLAY_MODE_DOUBLE || gamemode == Option::PLAY_MODE_DP_GHOST_BATTLE)
+    {
+        val = !State::get(IndexSwitch::PLAY_OPTION_DP_FLIP);
+    }
+    State::set(IndexSwitch::PLAY_OPTION_DP_FLIP, val);
+    State::set(IndexText::FLIP, val ? "DP FLIP" : "OFF");
+
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
 }
 
@@ -568,48 +638,99 @@ void hs_fix(int plus)
 {
     // eModHs
     //OFF/MAXBPM/MINBPM/AVERAGE/CONSTANT
-    int val = (gOptions.get(eOption::PLAY_HSFIX_TYPE_1P) + 5 + plus) % 5;
+    int val = (State::get(IndexOption::PLAY_HSFIX_TYPE) + 5 + plus) % 5;
     
-    gOptions.set(eOption::PLAY_HSFIX_TYPE_1P, val);
-    gOptions.set(eOption::PLAY_HSFIX_TYPE_2P, val);
-
-    switch (val)
-    {
-    case 0: 
-        gTexts.set(eText::SCROLL_TYPE, "OFF"); 
-        break;
-    case 1:
-        gTexts.set(eText::SCROLL_TYPE, "MAX");
-        break;
-    case 2:
-        gTexts.set(eText::SCROLL_TYPE, "MIN");
-        break;
-    case 3:
-        gTexts.set(eText::SCROLL_TYPE, "AVERAGE");
-        break;
-    case 4:
-        gTexts.set(eText::SCROLL_TYPE, "CONSTANT");
-        break;
-    default: 
-        break;
-    }
+    State::set(IndexOption::PLAY_HSFIX_TYPE, val);
+    State::set(IndexText::SCROLL_TYPE, Option::s_speed_type[val]);
 
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
 
     auto& [score, lamp] = getSaveScoreType();
-    gSwitches.set(eSwitch::CHART_CAN_SAVE_SCORE, score);
-    gOptions.set(eOption::CHART_SAVE_LAMP_TYPE, lamp);
+    State::set(IndexSwitch::CHART_CAN_SAVE_SCORE, score);
+    State::set(IndexOption::CHART_SAVE_LAMP_TYPE, lamp);
 }
 
 // 56
 void battle(int plus)
 {
+    // we only planned to support 3 battle modes: SP Battle (SP->2P) / DB (SP->DP) / Ghost Battle (SP->2P)
+    switch (gSelectContext.filterKeys)
+    {
+    case 0:
+    case 1:
+    case 5:
+    case 7:
+    case 9:
+    {
+        static const std::vector<Option::e_battle_type> modesSP =
+        {
+            Option::BATTLE_OFF,
+            Option::BATTLE_LOCAL,
+            Option::BATTLE_GHOST
+        };
+        auto it = std::find(modesSP.begin(), modesSP.end(), State::get(IndexOption::PLAY_BATTLE_TYPE));
+        if (it != modesSP.end())
+        {
+            int idx = std::distance(modesSP.begin(), it);
+            idx = (idx + modesSP.size() + plus) % modesSP.size();
+            State::set(IndexOption::PLAY_BATTLE_TYPE, modesSP[idx]);
+
+            setPlayModeInfo();
+        }
+        break;
+    }
+    case 2:
+    case 10:
+    case 14:
+    {
+        static const std::vector<Option::e_battle_type> modesDP =
+        {
+            Option::BATTLE_OFF,
+            Option::BATTLE_DB,
+            Option::BATTLE_GHOST
+        };
+        auto it = std::find(modesDP.begin(), modesDP.end(), State::get(IndexOption::PLAY_BATTLE_TYPE));
+        if (it != modesDP.end())
+        {
+            int idx = std::distance(modesDP.begin(), it);
+            idx = (idx + modesDP.size() + plus) % modesDP.size();
+            State::set(IndexOption::PLAY_BATTLE_TYPE, modesDP[idx]);
+
+            if (*it == Option::BATTLE_DB || modesDP[idx] == Option::BATTLE_DB)
+            {
+                std::unique_lock l(gSelectContext._mutex);
+                loadSongList();
+                sortSongList();
+                setBarInfo();
+                setEntryInfo();
+            }
+            else
+            {
+                State::set(IndexOption::PLAY_MODE, Option::PLAY_MODE_DOUBLE);
+                setPlayModeInfo();
+            }
+        }
+        break;
+    }
+    }
+    State::set(IndexText::BATTLE, Option::s_battle_type[State::get(IndexOption::PLAY_BATTLE_TYPE)]);
+
+    if (State::get(IndexOption::PLAY_MODE) != Option::PLAY_MODE_BATTLE)
+    {
+        State::set(IndexOption::PLAY_LANE_EFFECT_TYPE_2P, State::get(IndexOption::PLAY_LANE_EFFECT_TYPE_1P));
+        lane_effect(PLAYER_SLOT_TARGET, 0);
+        State::set(IndexSwitch::PLAY_OPTION_AUTOSCR_2P, State::get(IndexSwitch::PLAY_OPTION_AUTOSCR_1P));
+        autoscr(PLAYER_SLOT_TARGET, 0);
+    }
+
+    State::set(IndexSwitch::PLAY_OPTION_DP_FLIP, false);
+    State::set(IndexText::FLIP, "OFF");
 
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
 
     auto& [score, lamp] = getSaveScoreType();
-    gSwitches.set(eSwitch::CHART_CAN_SAVE_SCORE, score);
-    gOptions.set(eOption::CHART_SAVE_LAMP_TYPE, lamp);
+    State::set(IndexSwitch::CHART_CAN_SAVE_SCORE, score);
+    State::set(IndexOption::CHART_SAVE_LAMP_TYPE, lamp);
 }
 
 // 57, 58
@@ -620,12 +741,12 @@ void hs(int player, int plus)
     switch (player)
     {
     case 0: 
-        number_change_clamp(eNumber::HS_1P, 50, 1000, plus);
-        gPlayContext.Hispeed = gNumbers.get(eNumber::HS_1P) / 100.0;
+        number_change_clamp(IndexNumber::HS_1P, 50, 1000, plus);
+        gPlayContext.Hispeed = State::get(IndexNumber::HS_1P) / 100.0;
         break;
     case 1: 
-        number_change_clamp(eNumber::HS_2P, 50, 1000, plus);
-        gPlayContext.battle2PHispeed = gNumbers.get(eNumber::HS_2P) / 100.0;
+        number_change_clamp(IndexNumber::HS_2P, 50, 1000, plus);
+        gPlayContext.battle2PHispeed = State::get(IndexNumber::HS_2P) / 100.0;
         break;
     default: break;
     }
@@ -634,17 +755,17 @@ void hs(int player, int plus)
 // 70
 void score_graph(int plus)
 {
-    if (gSwitches.get(eSwitch::SYSTEM_SCOREGRAPH))
+    if (State::get(IndexSwitch::SYSTEM_SCOREGRAPH))
     {
         // close
-        gSwitches.set(eSwitch::SYSTEM_SCOREGRAPH, false);
-        gTexts.set(eText::SCORE_GRAPH, "OFF");
+        State::set(IndexSwitch::SYSTEM_SCOREGRAPH, false);
+        State::set(IndexText::SCORE_GRAPH, "OFF");
     }
     else
     {
         // open
-        gSwitches.set(eSwitch::SYSTEM_SCOREGRAPH, true);
-        gTexts.set(eText::SCORE_GRAPH, "ON");
+        State::set(IndexSwitch::SYSTEM_SCOREGRAPH, true);
+        State::set(IndexText::SCORE_GRAPH, "ON");
     }
 
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
@@ -653,28 +774,11 @@ void score_graph(int plus)
 // 71
 void ghost_type(int plus)
 {
-    int val = (gOptions.get(eOption::PLAY_GHOST_TYPE_1P) + 4 + plus) % 4;
+    int val = (State::get(IndexOption::PLAY_GHOST_TYPE_1P) + 4 + plus) % 4;
 
-    gOptions.set(eOption::PLAY_GHOST_TYPE_1P, val);
-    gOptions.set(eOption::PLAY_GHOST_TYPE_2P, val);
-
-    switch (val)
-    {
-    case 0:
-        gTexts.set(eText::GHOST, "OFF");
-        break;
-    case 1:
-        gTexts.set(eText::GHOST, "TYPE A");
-        break;
-    case 2:
-        gTexts.set(eText::GHOST, "TYPE B");
-        break;
-    case 3:
-        gTexts.set(eText::GHOST, "TYPE C");
-        break;
-    default:
-        break;
-    }
+    State::set(IndexOption::PLAY_GHOST_TYPE_1P, val);
+    State::set(IndexOption::PLAY_GHOST_TYPE_2P, val);
+    State::set(IndexText::GHOST, Option::s_play_ghost_mode[val]);
 
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
 }
@@ -682,34 +786,30 @@ void ghost_type(int plus)
 // 72
 void bga(int plus)
 {
-    int val = (gOptions.get(eOption::PLAY_BGA_TYPE) + 2 + plus) % 2;
+    int val = (State::get(IndexOption::PLAY_BGA_TYPE) + 3 + plus) % 3;
 
-    gOptions.set(eOption::PLAY_BGA_TYPE, val);
-    ConfigMgr::set('P', cfg::P_LOAD_BGA, (val != 0));
-
-    switch (val)
-    {
-    case 0:
-        gTexts.set(eText::BGA, "OFF");
-        break;
-    case 1:
-        gTexts.set(eText::BGA, "ON");
-        break;
-    //case 2:
-    //    gTexts.set(eText::BGA, "AUTOPLAY");
-    //    break;
-    default:
-        break;
-    }
+    State::set(IndexOption::PLAY_BGA_TYPE, val);
+    State::set(IndexText::BGA, Option::s_bga_type[val]);
 
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
+
+    // Play scene will check this config
+    ConfigMgr::set('P', cfg::P_BGA_TYPE, val);
+
 }
 
 // 73
 void bga_size(int plus)
 {
+    int val = (State::get(IndexOption::PLAY_BGA_SIZE) + 2 + plus) % 2;
+
+    State::set(IndexOption::PLAY_BGA_SIZE, val);
+    State::set(IndexText::BGA_SIZE, Option::s_bga_size[val]);
 
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
+
+    // Play scene will check this config
+    ConfigMgr::set('P', cfg::P_BGA_SIZE, val);
 }
 
 // 75
@@ -720,48 +820,61 @@ void judge_auto_adjust(int plus)
 
 }
 
+// 76
+void default_target_rate(int plus)
+{
+    number_change_clamp(IndexNumber::DEFAULT_TARGET_RATE, 0, 100, plus);
+
+    if (State::get(IndexOption::PLAY_TARGET_TYPE) == Option::TARGET_DEFAULT)
+        State::set(IndexText::TARGET_NAME, (boost::format("%d%%") % State::get(IndexNumber::DEFAULT_TARGET_RATE)).str());
+}
+
 // 77
 void target_type(int plus)
 {
+    int val = (State::get(IndexOption::PLAY_TARGET_TYPE) + 6 + plus) % 6;
 
-    SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
+    State::set(IndexOption::PLAY_TARGET_TYPE, val);
+    if (val == Option::TARGET_DEFAULT)
+    {
+        State::set(IndexText::TARGET_NAME, (boost::format("RATE %d%%") % State::get(IndexNumber::DEFAULT_TARGET_RATE)).str());
+    }
+    else
+    {
+        State::set(IndexText::TARGET_NAME, Option::s_target_type[val]);
+    }
+
+    if (plus)
+        SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
 }
 
 // 80
 void window_mode(int plus)
 {
-    int val = (gOptions.get(eOption::SYS_WINDOWED) + 3 + plus) % 3;
-
-    gOptions.set(eOption::SYS_WINDOWED, val);
-
-    // TODO recreate window
-    switch (val)
-    {
-    case Option::WIN_FULLSCREEN: 
-        gTexts.set(eText::WINDOWMODE, "FULLSCREEN");
-        break;
-    case Option::WIN_BORDERLESS:
-        gTexts.set(eText::WINDOWMODE, "BORDERLESS");
-        break;
-    case Option::WIN_WINDOWED:
-        gTexts.set(eText::WINDOWMODE, "WINDOWED");
-        break;
-    default:
-        break;
-    }
-
-    SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
+    // This button is disabled.
 }
 
 // 82
 void vsync(int plus)
 {
+#if _WIN32
+    int val = (State::get(IndexOption::SYS_VSYNC) + 2 + plus) % 2;
+#else
+    int val = (State::get(IndexOption::SYS_VSYNC) + 3 + plus) % 3;
+#endif
+
+    State::set(IndexOption::SYS_VSYNC, val);
+    State::set(IndexText::VSYNC, Option::s_vsync_mode[val]);
+
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
+
+    graphics_change_vsync(val);
 }
 
 // 83
 void save_replay_type(int plus)
 {
+    // TODO 
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
 }
 
@@ -774,7 +887,7 @@ void favorite_ignore(int plus)
 // 91 - 96
 void difficulty(int diff, int plus)
 {
-    gOptions.set(eOption::SELECT_FILTER_DIFF, diff);
+    State::set(IndexOption::SELECT_FILTER_DIFF, diff);
 
     {
         std::unique_lock l(gSelectContext._mutex);
@@ -810,45 +923,45 @@ void key_config_pad(Input::Pad pad)
         {
             switch (pad)
             {
-            case Input::Pad::K11:      gSwitches.set(eSwitch::K11_CONFIG, sw); break;
-            case Input::Pad::K12:      gSwitches.set(eSwitch::K12_CONFIG, sw); break;
-            case Input::Pad::K13:      gSwitches.set(eSwitch::K13_CONFIG, sw); break;
-            case Input::Pad::K14:      gSwitches.set(eSwitch::K14_CONFIG, sw); break;
-            case Input::Pad::K15:      gSwitches.set(eSwitch::K15_CONFIG, sw); break;
-            case Input::Pad::K16:      gSwitches.set(eSwitch::K16_CONFIG, sw); break;
-            case Input::Pad::K17:      gSwitches.set(eSwitch::K17_CONFIG, sw); break;
-            case Input::Pad::K18:      gSwitches.set(eSwitch::K18_CONFIG, sw); break;
-            case Input::Pad::K19:      gSwitches.set(eSwitch::K19_CONFIG, sw); break;
-            case Input::Pad::S1L:      gSwitches.set(eSwitch::S1L_CONFIG, sw); break;
-            case Input::Pad::S1R:      gSwitches.set(eSwitch::S1R_CONFIG, sw); break;
-            case Input::Pad::K1START:  gSwitches.set(eSwitch::K1START_CONFIG, sw); break;
-            case Input::Pad::K1SELECT: gSwitches.set(eSwitch::K1SELECT_CONFIG, sw); break;
-            case Input::Pad::K1SPDUP:  gSwitches.set(eSwitch::K1SPDUP_CONFIG, sw); break;
-            case Input::Pad::K1SPDDN:  gSwitches.set(eSwitch::K1SPDDN_CONFIG, sw); break;
-            case Input::Pad::K21:      gSwitches.set(eSwitch::K21_CONFIG, sw); break;
-            case Input::Pad::K22:      gSwitches.set(eSwitch::K22_CONFIG, sw); break;
-            case Input::Pad::K23:      gSwitches.set(eSwitch::K23_CONFIG, sw); break;
-            case Input::Pad::K24:      gSwitches.set(eSwitch::K24_CONFIG, sw); break;
-            case Input::Pad::K25:      gSwitches.set(eSwitch::K25_CONFIG, sw); break;
-            case Input::Pad::K26:      gSwitches.set(eSwitch::K26_CONFIG, sw); break;
-            case Input::Pad::K27:      gSwitches.set(eSwitch::K27_CONFIG, sw); break;
-            case Input::Pad::K28:      gSwitches.set(eSwitch::K28_CONFIG, sw); break;
-            case Input::Pad::K29:      gSwitches.set(eSwitch::K29_CONFIG, sw); break;
-            case Input::Pad::S2L:      gSwitches.set(eSwitch::S2L_CONFIG, sw); break;
-            case Input::Pad::S2R:      gSwitches.set(eSwitch::S2R_CONFIG, sw); break;
-            case Input::Pad::K2START:  gSwitches.set(eSwitch::K2START_CONFIG, sw); break;
-            case Input::Pad::K2SELECT: gSwitches.set(eSwitch::K2SELECT_CONFIG, sw); break;
-            case Input::Pad::K2SPDUP:  gSwitches.set(eSwitch::K2SPDUP_CONFIG, sw); break;
-            case Input::Pad::K2SPDDN:  gSwitches.set(eSwitch::K2SPDDN_CONFIG, sw); break;
+            case Input::Pad::K11:      State::set(IndexSwitch::K11_CONFIG, sw); break;
+            case Input::Pad::K12:      State::set(IndexSwitch::K12_CONFIG, sw); break;
+            case Input::Pad::K13:      State::set(IndexSwitch::K13_CONFIG, sw); break;
+            case Input::Pad::K14:      State::set(IndexSwitch::K14_CONFIG, sw); break;
+            case Input::Pad::K15:      State::set(IndexSwitch::K15_CONFIG, sw); break;
+            case Input::Pad::K16:      State::set(IndexSwitch::K16_CONFIG, sw); break;
+            case Input::Pad::K17:      State::set(IndexSwitch::K17_CONFIG, sw); break;
+            case Input::Pad::K18:      State::set(IndexSwitch::K18_CONFIG, sw); break;
+            case Input::Pad::K19:      State::set(IndexSwitch::K19_CONFIG, sw); break;
+            case Input::Pad::S1L:      State::set(IndexSwitch::S1L_CONFIG, sw); break;
+            case Input::Pad::S1R:      State::set(IndexSwitch::S1R_CONFIG, sw); break;
+            case Input::Pad::K1START:  State::set(IndexSwitch::K1START_CONFIG, sw); break;
+            case Input::Pad::K1SELECT: State::set(IndexSwitch::K1SELECT_CONFIG, sw); break;
+            case Input::Pad::K1SPDUP:  State::set(IndexSwitch::K1SPDUP_CONFIG, sw); break;
+            case Input::Pad::K1SPDDN:  State::set(IndexSwitch::K1SPDDN_CONFIG, sw); break;
+            case Input::Pad::K21:      State::set(IndexSwitch::K21_CONFIG, sw); break;
+            case Input::Pad::K22:      State::set(IndexSwitch::K22_CONFIG, sw); break;
+            case Input::Pad::K23:      State::set(IndexSwitch::K23_CONFIG, sw); break;
+            case Input::Pad::K24:      State::set(IndexSwitch::K24_CONFIG, sw); break;
+            case Input::Pad::K25:      State::set(IndexSwitch::K25_CONFIG, sw); break;
+            case Input::Pad::K26:      State::set(IndexSwitch::K26_CONFIG, sw); break;
+            case Input::Pad::K27:      State::set(IndexSwitch::K27_CONFIG, sw); break;
+            case Input::Pad::K28:      State::set(IndexSwitch::K28_CONFIG, sw); break;
+            case Input::Pad::K29:      State::set(IndexSwitch::K29_CONFIG, sw); break;
+            case Input::Pad::S2L:      State::set(IndexSwitch::S2L_CONFIG, sw); break;
+            case Input::Pad::S2R:      State::set(IndexSwitch::S2R_CONFIG, sw); break;
+            case Input::Pad::K2START:  State::set(IndexSwitch::K2START_CONFIG, sw); break;
+            case Input::Pad::K2SELECT: State::set(IndexSwitch::K2SELECT_CONFIG, sw); break;
+            case Input::Pad::K2SPDUP:  State::set(IndexSwitch::K2SPDUP_CONFIG, sw); break;
+            case Input::Pad::K2SPDDN:  State::set(IndexSwitch::K2SPDDN_CONFIG, sw); break;
             case Input::Pad::S1A:      
-                gSwitches.set(eSwitch::S1L_CONFIG, sw);
-                gSwitches.set(eSwitch::S1R_CONFIG, sw);
-                gSwitches.set(eSwitch::S1A_CONFIG, sw); 
+                State::set(IndexSwitch::S1L_CONFIG, sw);
+                State::set(IndexSwitch::S1R_CONFIG, sw);
+                State::set(IndexSwitch::S1A_CONFIG, sw); 
                 break;
             case Input::Pad::S2A:
-                gSwitches.set(eSwitch::S2L_CONFIG, sw);
-                gSwitches.set(eSwitch::S2R_CONFIG, sw);
-                gSwitches.set(eSwitch::S2A_CONFIG, sw);
+                State::set(IndexSwitch::S2L_CONFIG, sw);
+                State::set(IndexSwitch::S2R_CONFIG, sw);
+                State::set(IndexSwitch::S2A_CONFIG, sw);
                 break;
             default: break;
             }
@@ -883,7 +996,7 @@ void key_config_pad(Input::Pad pad)
                 case Input::Pad::S2A:      idx = 20; break;
                 default: break;
                 }
-                gOptions.set(eOption::KEY_CONFIG_KEY5, idx);
+                State::set(IndexOption::KEY_CONFIG_KEY5, idx);
                 break;
             case 7:
                 switch (pad)
@@ -914,7 +1027,7 @@ void key_config_pad(Input::Pad pad)
                 case Input::Pad::S2A:      idx = 24; break;
                 default: break;
                 }
-                gOptions.set(eOption::KEY_CONFIG_KEY7, idx);
+                State::set(IndexOption::KEY_CONFIG_KEY7, idx);
                 break;
             case 9:
                 switch (pad)
@@ -932,7 +1045,7 @@ void key_config_pad(Input::Pad pad)
                 case Input::Pad::K1SELECT: idx = 11; break;
                 default: break;
                 }
-                gOptions.set(eOption::KEY_CONFIG_KEY9, idx);
+                State::set(IndexOption::KEY_CONFIG_KEY9, idx);
                 break;
             default:
                 break;
@@ -945,10 +1058,10 @@ void key_config_pad(Input::Pad pad)
         sel.first = pad;
 
         auto bindings = ConfigMgr::Input(gKeyconfigContext.keys)->getBindings(pad);
-        gTexts.set(eText::KEYCONFIG_SLOT1, bindings.toString());
+        State::set(IndexText::KEYCONFIG_SLOT1, bindings.toString());
         for (size_t i = 1; i < 10; ++i)
         {
-            gTexts.set(eText(unsigned(eText::KEYCONFIG_SLOT1) + i), "-");
+            State::set(IndexText(unsigned(IndexText::KEYCONFIG_SLOT1) + i), "-");
         }
     }
     SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
@@ -967,9 +1080,9 @@ void key_config_mode_rotate()
     }
     switch (keys)
     {
-    case 7: gOptions.set(eOption::KEY_CONFIG_MODE, Option::KEYCFG_7); break;
-    case 9: gOptions.set(eOption::KEY_CONFIG_MODE, Option::KEYCFG_9); break;
-    case 5: gOptions.set(eOption::KEY_CONFIG_MODE, Option::KEYCFG_5); break;
+    case 7: State::set(IndexOption::KEY_CONFIG_MODE, Option::KEYCFG_7); break;
+    case 9: State::set(IndexOption::KEY_CONFIG_MODE, Option::KEYCFG_9); break;
+    case 5: State::set(IndexOption::KEY_CONFIG_MODE, Option::KEYCFG_5); break;
     default: return;
     }
 
@@ -987,16 +1100,16 @@ void key_config_slot(int slot)
         {
             switch (slot)
             {
-            case 0:      gSwitches.set(eSwitch::KEY_CONFIG_SLOT0, sw); break;
-            case 1:      gSwitches.set(eSwitch::KEY_CONFIG_SLOT1, sw); break;
-            case 2:      gSwitches.set(eSwitch::KEY_CONFIG_SLOT2, sw); break;
-            case 3:      gSwitches.set(eSwitch::KEY_CONFIG_SLOT3, sw); break;
-            case 4:      gSwitches.set(eSwitch::KEY_CONFIG_SLOT4, sw); break;
-            case 5:      gSwitches.set(eSwitch::KEY_CONFIG_SLOT5, sw); break;
-            case 6:      gSwitches.set(eSwitch::KEY_CONFIG_SLOT6, sw); break;
-            case 7:      gSwitches.set(eSwitch::KEY_CONFIG_SLOT7, sw); break;
-            case 8:      gSwitches.set(eSwitch::KEY_CONFIG_SLOT8, sw); break;
-            case 9:      gSwitches.set(eSwitch::KEY_CONFIG_SLOT9, sw); break;
+            case 0:      State::set(IndexSwitch::KEY_CONFIG_SLOT0, sw); break;
+            case 1:      State::set(IndexSwitch::KEY_CONFIG_SLOT1, sw); break;
+            case 2:      State::set(IndexSwitch::KEY_CONFIG_SLOT2, sw); break;
+            case 3:      State::set(IndexSwitch::KEY_CONFIG_SLOT3, sw); break;
+            case 4:      State::set(IndexSwitch::KEY_CONFIG_SLOT4, sw); break;
+            case 5:      State::set(IndexSwitch::KEY_CONFIG_SLOT5, sw); break;
+            case 6:      State::set(IndexSwitch::KEY_CONFIG_SLOT6, sw); break;
+            case 7:      State::set(IndexSwitch::KEY_CONFIG_SLOT7, sw); break;
+            case 8:      State::set(IndexSwitch::KEY_CONFIG_SLOT8, sw); break;
+            case 9:      State::set(IndexSwitch::KEY_CONFIG_SLOT9, sw); break;
             default: break;
             }
         };
@@ -1010,7 +1123,6 @@ void key_config_slot(int slot)
 
 void skinselect_mode(int mode)
 {
-    eMode modeOld = gCustomizeContext.mode;
     switch (mode)
     {
     case 0: gCustomizeContext.mode = eMode::PLAY7; break;
@@ -1032,8 +1144,8 @@ void skinselect_mode(int mode)
     default: break;
     }
 
-    if (modeOld != gCustomizeContext.mode)
-        SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
+    gCustomizeContext.modeUpdate = true;
+    SoundMgr::playSysSample(SoundChannelType::KEY_SYS, eSoundSample::SOUND_O_CHANGE);
 }
 
 void skinselect_skin(int plus)
@@ -1133,6 +1245,11 @@ std::function<void(int)> getButtonCallback(int type)
     case 46:
         return std::bind(shutter, _1);
 
+    case 50:
+        return std::bind(lane_effect, 0, _1);
+    case 51:
+        return std::bind(lane_effect, 1, _1);
+
     case 54:
         return std::bind(flip, _1);
 
@@ -1160,13 +1277,13 @@ std::function<void(int)> getButtonCallback(int type)
         return std::bind(bga_size, _1);
 
     case 74:
-        return std::bind(number_change_clamp, eNumber::TIMING_ADJUST_VISUAL, -99, 99, _1);
+        return std::bind(number_change_clamp, IndexNumber::TIMING_ADJUST_VISUAL, -99, 99, _1);
 
     case 75:
         return std::bind(judge_auto_adjust, _1);
 
     case 76:
-        return std::bind(number_change_clamp, eNumber::DEFAULT_TARGET_RATE, 0, 100, _1);
+        return std::bind(default_target_rate, _1);
 
     case 77:
         return std::bind(target_type, _1);
@@ -1288,10 +1405,8 @@ std::function<void(int)> getButtonCallback(int type)
     case 228:
     case 229:
         return std::bind(skinselect_option, type - 220, _1);
-
-    default:
-        return [](bool) {};
     }
+    return [](bool) {};
 }
 
 

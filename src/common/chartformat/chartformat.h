@@ -18,7 +18,7 @@ enum class eChartFormat
 };
 eChartFormat analyzeChartType(const Path& p);
 
-class vChartFormat: public std::enable_shared_from_this<vChartFormat>
+class ChartFormatBase: public std::enable_shared_from_this<ChartFormatBase>
 {
 protected:
     eChartFormat _type = eChartFormat::UNKNOWN;
@@ -26,9 +26,9 @@ public:
     constexpr eChartFormat type() { return _type; }
 
 public:
-    vChartFormat() = default;
-    virtual ~vChartFormat() = default;
-    static std::shared_ptr<vChartFormat> createFromFile(const Path& path);
+    ChartFormatBase() = default;
+    virtual ~ChartFormatBase() = default;
+    static std::shared_ptr<ChartFormatBase> createFromFile(const Path& path, uint64_t randomSeed);
 
 protected:
     Path _path;
@@ -74,6 +74,8 @@ public:
 
     std::vector<Metre> metres;
     //std::vector<_Inherit_SpriteStatic_with_playbegin_timer_> _BGAsprites;
+
+    bool resourceStable = true;    // Some BMS come with WAV/BGA resources defined inside a #RANDOM block; This variable is to prevent incorrect caching.
 
 public:
     Path getDirectory() const;

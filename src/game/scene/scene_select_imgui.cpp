@@ -4,6 +4,10 @@
 #include "game/sound/sound_sample.h"
 #include "imgui.h"
 
+#ifdef _WIN32
+#include <shellapi.h>
+#endif
+
 void SceneSelect::_imguiSampleDialog()
 {
     if (imguiShow)
@@ -18,6 +22,7 @@ void SceneSelect::_imguiInit()
     old_profile_index = imgui_profile_index;
 
     _imguiRefreshFolderList();
+    _imguiRefreshTableList();
 
     _imguiRefreshVideoResolutionList();
     auto resolutionY = ConfigMgr::get("V", cfg::V_RES_Y, CANVAS_HEIGHT);
@@ -78,7 +83,12 @@ void SceneSelect::_imguiInit()
         imgui_video_mode = 0;
     old_video_mode = imgui_video_mode;
 
-    imgui_video_vsync = ConfigMgr::get("V", cfg::V_VSYNC, false);
+    imgui_video_vsync_index = ConfigMgr::get("V", cfg::V_VSYNC, 0);
+#if _WIN32
+    if (imgui_video_vsync_index >= 2)
+        imgui_video_vsync_index = 1;
+#endif
+
     imgui_video_maxFPS = ConfigMgr::get("V", cfg::V_MAXFPS, 240);
 
     imgui_audio_checkASIODevices = ConfigMgr::get("A", cfg::A_MODE, cfg::A_MODE_ASIO) == cfg::A_MODE_ASIO;
@@ -99,6 +109,7 @@ void SceneSelect::_imguiInit()
     if (imgui_folders.empty())
     {
         imguiShow = true;
+        _skin->setHandleMouseEvents(false);
     }
 }
 
@@ -129,7 +140,7 @@ void SceneSelect::_imguiSettings()
 
             if (ImGui::CollapsingHeader("Folder"))
             {
-                ImGui::Text("*Changing folder settings requires a restart now.");
+                ImGui::Text("* Refresh by pressing F8 at song select screen!");
 
                 ImGui::ListBox("Folders", &imgui_folder_index, imgui_folders_display.data(), imgui_folders_display.size());
 
@@ -152,20 +163,55 @@ void SceneSelect::_imguiSettings()
                 ImGui::Spacing();
             }
 
+            if (ImGui::CollapsingHeader("Table"))
+            {
+                ImGui::Text("* Refresh by pressing F8 at song select screen!");
+
+                ImGui::ListBox("Tables", &imgui_table_index, imgui_tables_display.data(), imgui_tables_display.size());
+
+                if (ImGui::Button("Add..."))
+                {
+                    imgui_table_popup = true;
+                    ImGui::OpenPopup("Input table URL");
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Delete Selected"))
+                {
+                    _imguiDelTable();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Update Selected"))
+                {
+                    _imguiUpdateTable();
+                }
+
+                ImGui::Separator();
+                ImGui::Spacing();
+            }
+
             if (ImGui::CollapsingHeader("Video"))
             {
                 ImGui::Combo("Internal Resolution", &imgui_video_resolution_index, imgui_video_resolution_display.data(), (int)imgui_video_resolution_display.size());
                 ImGui::Combo("Display Resolution", &imgui_video_display_resolution_index, imgui_video_display_resolution_display.data(), (int)imgui_video_display_resolution_display.size());
 
-                ImGui::RadioButton("Windowed", &imgui_video_mode, 0);
-                ImGui::SameLine();
-                ImGui::RadioButton("FullScreen", &imgui_video_mode, 1);
-                ImGui::SameLine();
-                ImGui::RadioButton("Borderless", &imgui_video_mode, 2);
-                ImGui::SameLine();
-                ImGui::Checkbox("VSync", &imgui_video_vsync);
-                ImGui::SameLine();
-                ImGui::Spacing();
+                static const char* imgui_video_mode_display[] =
+                {
+                    "Windowed",
+                    "FullScreen",
+                    "Borderless"
+                };
+                ImGui::Combo("Screen Mode", &imgui_video_mode, imgui_video_mode_display, sizeof(imgui_video_mode_display) / sizeof(char*));
+
+                static const char* imgui_vsync_mode_display[] =
+                {
+                    "Off",
+                    "On",
+#if _WIN32
+#else
+                    "Adaptive"
+#endif
+                };
+                ImGui::Combo("VSync", &imgui_video_vsync_index, imgui_vsync_mode_display, sizeof(imgui_vsync_mode_display) / sizeof(char*));
 
                 ImGui::InputInt("Max FPS", &imgui_video_maxFPS, 0);
 
@@ -234,6 +280,29 @@ void SceneSelect::_imguiSettings()
             }
 
         }
+        if (imgui_table_popup)
+        {
+            if (ImGui::BeginPopupModal("Input table URL", nullptr, ImGuiWindowFlags_NoCollapse))
+            {
+                if (ImGui::InputText("URL", imgui_table_url_buf, sizeof(imgui_table_url_buf), ImGuiInputTextFlags_EnterReturnsTrue)
+                    || ImGui::Button("OK"))
+                {
+                    _imguiAddTable();
+                    memset(imgui_table_url_buf, 0, sizeof(imgui_table_url_buf));
+                    ImGui::CloseCurrentPopup();
+                    imgui_table_popup = false;
+                }
+
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel"))
+                {
+                    memset(imgui_table_url_buf, 0, sizeof(imgui_table_url_buf));
+                    ImGui::CloseCurrentPopup();
+                    imgui_table_popup = false;
+                }
+            }
+            ImGui::EndPopup();
+        }
         ImGui::End();
     }
 
@@ -295,6 +364,18 @@ void SceneSelect::_imguiRefreshFolderList()
     imgui_folders.assign(folders.begin(), folders.end());
     for (const auto& f : imgui_folders)
         imgui_folders_display.push_back(f.c_str());
+}
+
+void SceneSelect::_imguiRefreshTableList()
+{
+    imgui_table_index = -1;
+    imgui_tables.clear();
+    imgui_tables_display.clear();
+
+    auto tables = ConfigMgr::General()->getTablesUrl();
+    imgui_tables.assign(tables.begin(), tables.end());
+    for (const auto& f : imgui_tables)
+        imgui_tables_display.push_back(f.c_str());
 }
 
 void SceneSelect::_imguiRefreshVideoResolutionList()
@@ -399,10 +480,11 @@ void SceneSelect::_imguiCheckSettings()
         case 2: windowMode = cfg::V_WINMODE_BORDERLESS; break;
         }
         ConfigMgr::set("V", cfg::V_WINMODE, windowMode);
+
     }
-    if (imgui_video_vsync != ConfigMgr::get("V", cfg::V_VSYNC, false))
+    if (imgui_video_vsync_index != ConfigMgr::get("V", cfg::V_VSYNC, 0))
     {
-        ConfigMgr::set("V", cfg::V_VSYNC, imgui_video_vsync);
+        ConfigMgr::set("V", cfg::V_VSYNC, imgui_video_vsync_index);
     }
 
     if (imgui_audio_device_index != old_audio_device_index && imgui_audio_devices_display[imgui_audio_device_index] != ConfigMgr::get('A', cfg::A_DEVNAME, ""))
@@ -470,7 +552,7 @@ bool SceneSelect::_imguiAddFolder()
 
             ConfigMgr::General()->setFolders(std::vector<std::string>(imgui_folders.begin(), imgui_folders.end()));
 
-            // TODO reload?
+            // TODO auto refresh?
         }
         CoTaskMemFree(lpiil);
     }
@@ -488,7 +570,9 @@ bool SceneSelect::_imguiDelFolder()
     if (imgui_folder_index == oldSize - 1)
         imgui_folder_index--;
 
-    return false;
+    ConfigMgr::General()->setFolders(std::vector<std::string>(imgui_folders.begin(), imgui_folders.end()));
+
+    return true;
 }
 
 bool SceneSelect::_imguiBrowseFolder()
@@ -502,6 +586,50 @@ bool SceneSelect::_imguiBrowseFolder()
 #elif defined __linux__
     // linux has many WMs that may have to handle differently
 #endif
+
+    return true;
+}
+
+bool SceneSelect::_imguiAddTable()
+{
+    bool added = false;
+
+    imgui_tables.push_back(imgui_table_url_buf);
+    imgui_tables_display.push_back(imgui_tables.back().c_str());
+    added = true;
+
+    if (added)
+    {
+        imgui_table_index = imgui_tables.size() - 1;
+
+        ConfigMgr::General()->setTables(std::vector<std::string>(imgui_tables.begin(), imgui_tables.end()));
+
+        _imguiUpdateTable();
+    }
+
+    return added;
+}
+
+bool SceneSelect::_imguiDelTable()
+{
+    if (imgui_table_index < 0 || imgui_table_index >= imgui_tables_display.size()) return false;
+
+    int oldSize = imgui_tables.size();
+    imgui_tables.erase(std::next(imgui_tables.begin(), imgui_table_index));
+    imgui_tables_display.erase(std::next(imgui_tables_display.begin(), imgui_table_index));
+    if (imgui_table_index == oldSize - 1)
+        imgui_table_index--;
+
+    ConfigMgr::General()->setTables(std::vector<std::string>(imgui_tables.begin(), imgui_tables.end()));
+
+    return false;
+}
+
+bool SceneSelect::_imguiUpdateTable()
+{
+    if (imgui_table_index < 0 || imgui_table_index >= imgui_tables_display.size()) return false;
+
+    // TODO call update table
 
     return true;
 }
@@ -520,7 +648,46 @@ bool SceneSelect::_imguiApplyResolution()
     graphics_resize_window(windowW, windowH);
     graphics_set_supersample_level(ss);
     graphics_resize_canvas(renderW, renderH);
-    graphics_change_vsync(imgui_video_vsync);
+    graphics_change_vsync(imgui_video_vsync_index);
+
+    // windowed
+    {
+        State::set(IndexOption::SYS_WINDOWED, imgui_video_mode == 1 ? 1 : 0);
+
+        static const std::map<int, std::string> smap =
+        {
+            {0, "WINDOWED"},
+            {1, "FULLSCREEN"},
+            {2, "BORDERLESS"},
+        };
+
+        auto&& s = imgui_video_mode;
+        if (smap.find(s) != smap.end())
+            State::set(IndexText::WINDOWMODE, smap.at(s));
+        else
+            State::set(IndexText::WINDOWMODE, "WINDOWED");
+    }
+    // vsync
+    {
+        State::set(IndexOption::SYS_VSYNC, imgui_video_vsync_index == 0 ? 0 : 1);
+
+        static const std::map<int, std::string> smap =
+        {
+            {0, "OFF"},
+            {1, "ON"},
+#if _WIN32
+            {2, "ON"}
+#else
+            {2, "ADAPTIVE"}
+#endif
+        };
+
+        auto&& s = imgui_video_vsync_index;
+        if (smap.find(s) != smap.end())
+            State::set(IndexText::VSYNC, smap.at(s));
+        else
+            State::set(IndexText::VSYNC, "OFF");
+    }
 
     return true;
 }

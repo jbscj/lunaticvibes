@@ -9,6 +9,7 @@ if (${GRAPHICS_BACKEND} STREQUAL SDL2)
 endif()
 
 add_library(gamelib
+    runtime/state.cpp
     chart/chart.cpp
     chart/chart_bms.cpp
     ${GRAPHICS_BACKEND_SRC}
@@ -23,40 +24,51 @@ add_library(gamelib
     graphics/dxa.cpp
     input/input_linux.cpp
     input/input_mgr.cpp
+    input/input_dinput8.cpp
     input/input_windows.cpp
     input/input_wrapper.cpp
     ruleset/ruleset_bms.cpp
+    ruleset/ruleset_bms_auto.cpp
+    ruleset/ruleset_bms_replay.cpp
     scene/scene.cpp
     scene/scene_context.cpp
     scene/scene_decide.cpp
     scene/scene_mgr.cpp
     scene/scene_play.cpp
-    scene/scene_play_retry_trans.cpp
+    scene/scene_pre_select.cpp
     scene/scene_result.cpp
     scene/scene_select.cpp
+    scene/scene_keyconfig.cpp
+    scene/scene_play_course_trans.cpp
+    scene/scene_customize.cpp
+    scene/scene_select_imgui.cpp
+    scene/scene_play_retry_trans.cpp
+    scene/scene_exit_trans.cpp
     skin/skin.cpp
     skin/skin_lr2.cpp
     skin/skin_lr2_button_callbacks.cpp
+    skin/skin_lr2_slider_callbacks.cpp
     skin/skin_lr2_converters.cpp
     skin/skin_lr2_dst.cpp
+    skin/skin_lr2_debug.cpp
     skin/skin_mgr.cpp
     sound/sound_fmod.cpp
     sound/sound_fmod_callback.cpp
     sound/sound_mgr.cpp
     sound/sound_sample.cpp  
-    scene/scene_keyconfig.cpp
-    scene/scene_play_course_trans.cpp
-    scene/scene_customize.cpp
-    skin/skin_lr2_slider_callbacks.cpp
-    scene/scene_select_imgui.cpp
-    ruleset/ruleset_bms_auto.cpp
-    scene/scene_exit_trans.cpp
-    skin/skin_lr2_debug.cpp
- "input/input_dinput8.cpp")
+    sound/soundset.cpp
+    sound/soundset_lr2.cpp
+    replay/replay_chart.cpp
+ )
 
 if (UNIX OR MINGW)
     target_link_libraries(gamelib PRIVATE -lpthread)
     target_link_libraries(gamelib PRIVATE -lstdc++fs)
+    target_link_libraries(gamelib PRIVATE -lcrypto)
+    target_link_libraries(gamelib PRIVATE -lssl)
+elseif (MSVC)
+    target_link_libraries(gamelib PRIVATE libcrypto.lib)
+    target_link_libraries(gamelib PRIVATE libssl.lib)
 endif()
 
 target_include_directories(gamelib PUBLIC 
@@ -75,6 +87,7 @@ target_link_libraries(gamelib
     PUBLIC fmod
     PUBLIC imgui
     PUBLIC re2
+    PUBLIC cereal
 )
 
 if (${GRAPHICS_BACKEND} STREQUAL SDL2)
@@ -105,15 +118,59 @@ target_precompile_headers(gamelib REUSE_FROM common)
 
 #############################################################
 
-add_executable(game game.cpp)
-target_link_libraries(game PRIVATE gamelib)
-set_target_properties(game PROPERTIES
+add_executable(LunaticVibes game.cpp)
+target_link_libraries(LunaticVibes PRIVATE gamelib)
+set_target_properties(LunaticVibes PROPERTIES
     CXX_STANDARD 17
 )
-if (${EXT_DEPEND_LIBFILES_SET})
-    add_custom_command(TARGET game POST_BUILD
+
+add_custom_command(TARGET LunaticVibes POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    $<TARGET_FILE:fmod>
+    $<$<BOOL:${USE_BUNDLED_SQLITE3}>:$<TARGET_FILE:SQLite3>>
+    $<TARGET_FILE_DIR:LunaticVibes>
+)
+
+if (WIN32)
+    if (BUILD_X64)
+        set(MINGW_LIB_DIR ${CMAKE_SOURCE_DIR}/ext/mingw/lib/x64)
+    else()
+        set(MINGW_LIB_DIR ${CMAKE_SOURCE_DIR}/ext/mingw/lib/x86)
+    endif()
+    file(GLOB MINGW_LIB_DLLS ${MINGW_LIB_DIR}/*.dll)
+    add_custom_command(TARGET LunaticVibes POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${EXT_DEPEND_LIBFILES}
-        $<TARGET_FILE_DIR:game>
+        ${MINGW_LIB_DLLS}
+        $<TARGET_FILE_DIR:LunaticVibes>
+    )
+endif()
+
+if (${GRAPHICS_BACKEND} STREQUAL SDL2)
+    add_custom_command(TARGET LunaticVibes POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:SDL2>
+        $<TARGET_FILE:SDL2_image>
+        $<TARGET_FILE:SDL2_image::libjpeg>
+        $<TARGET_FILE:SDL2_image::libpng>
+        $<TARGET_FILE:SDL2_image::libtiff>
+        $<TARGET_FILE:SDL2_image::libwebp>
+        $<TARGET_FILE:SDL2_ttf>
+        $<TARGET_FILE:SDL2_ttf::libfreetype>
+        $<TARGET_FILE:SDL2_ttf::zlib>
+        $<TARGET_FILE_DIR:LunaticVibes>
+    )
+endif()
+
+if (${VIDEO_ENABLED})
+    add_custom_command(TARGET LunaticVibes POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:libavcodec>
+        $<TARGET_FILE:libavdevice>
+        $<TARGET_FILE:libavfilter>
+        $<TARGET_FILE:libavformat>
+        $<TARGET_FILE:libswresample>
+        $<TARGET_FILE:libavutil>
+        $<TARGET_FILE:libswscale>
+        $<TARGET_FILE_DIR:LunaticVibes>
     )
 endif()

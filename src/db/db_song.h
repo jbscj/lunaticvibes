@@ -8,8 +8,8 @@
 #include "common/entry/entry_folder.h"
 #include "common/entry/entry_song.h"
 
-class vChartFormat;
-typedef std::shared_ptr<vChartFormat> pChart;
+class ChartFormatBase;
+typedef std::shared_ptr<ChartFormatBase> pChartFormat;
 
 inline const HashMD5 ROOT_FOLDER_HASH = md5("", 0);
 
@@ -51,28 +51,44 @@ public:
     SongDB& operator= (SongDB&) = delete;
 
 protected:
-    int addChart(const HashMD5& folder, const Path& path);
-    int removeChart(const HashMD5& md5);
+    bool addChart(const HashMD5& folder, const Path& path);
+    bool removeChart(const Path& path, const HashMD5& parent);
+    bool removeChart(const HashMD5& md5, const HashMD5& parent);
     
 public:
-    std::vector<pChart> findChartByName(const HashMD5& folder, const std::string&, unsigned limit = 1000) const;  // search from genre, version, artist, artist2, title, title2
-    std::vector<pChart> findChartByHash(const HashMD5&) const;  // chart may duplicate
-
-protected:
-    int addFolderCharts(const HashMD5& hash, const Path& folder);
+    std::vector<pChartFormat> findChartByName(const HashMD5& folder, const std::string&, unsigned limit = 1000) const;  // search from genre, version, artist, artist2, title, title2
+    std::vector<pChartFormat> findChartByHash(const HashMD5&) const;  // chart may duplicate, return a list
 
 public:
-    int addFolder(Path path, HashMD5 parent = ROOT_FOLDER_HASH);
-    int refreshFolder(const HashMD5& hash, const Path& path, FolderType type);
+    int addFolder(Path path, const HashMD5& parent = ROOT_FOLDER_HASH);
     int removeFolder(const HashMD5& hash, bool removeSong = false);
+    void waitLoadingFinish();
 
+protected:
+    int addNewFolder(const HashMD5& hash, const Path& path, const HashMD5& parent);
+    int refreshExistingFolder(const HashMD5& hash, const Path& path, FolderType type);
+
+public:
     HashMD5 getFolderParent(const HashMD5& folder) const;
     HashMD5 getFolderParent(const Path& path) const;
-    int getFolderPath(const HashMD5& folder, Path& output) const;
+    std::pair<bool, Path> getFolderPath(const HashMD5& folder) const;
     HashMD5 getFolderHash(Path path) const;
 
-    FolderRegular browse(HashMD5 root, bool recursive = true);
-    FolderSong browseSong(HashMD5 root);
-    FolderRegular search(HashMD5 root, std::string key);
+    EntryFolderRegular browse(HashMD5 root, bool recursive = true);
+    EntryFolderSong browseSong(HashMD5 root);
+    EntryFolderRegular search(HashMD5 root, std::string key);
 
+public:
+    int addChartTaskCount = 0;
+    int addChartTaskFinishCount = 0;
+    int addChartSuccess = 0;
+    int addChartModified = 0;
+    int addChartDeleted = 0;
+
+    std::shared_mutex addCurrentPathMutex;
+    std::string addCurrentPath;
+    void resetAddSummary();
+
+    bool stopRequested = false;
+    void stopLoading();
 };

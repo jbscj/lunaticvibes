@@ -50,6 +50,7 @@ public:
     constexpr size_t length() const { return _Len; }
     bool empty() const { return !set; }
     std::string hexdigest() const { return bin2hex(data, _Len); }
+    const unsigned char* hex() const { return data; }
 
     template <size_t _Len2>
     bool operator<(const Hash<_Len2>& rhs) const { return memcmp(data, rhs.data, _Len) < 0; }
@@ -65,7 +66,6 @@ public:
     bool operator!=(const Hash<_Len2>& rhs) const { return _Len != _Len2 || memcmp(data, rhs.data, _Len) != 0; }
 
 };
-
 typedef Hash<16> HashMD5;
 typedef Hash<32> HashSHA1;
 
@@ -90,12 +90,11 @@ enum class eMode {
     RESULT,
     COURSE_RESULT,
 
-    BGM,
-    SOUND,
-
     RETRY_TRANS,
     COURSE_TRANS,
     EXIT_TRANS,
+
+    PRE_SELECT,
 
     TMPL,
     TEST,
@@ -108,12 +107,11 @@ enum class ePlayMode
     SINGLE_PLAYER,  // means "Single Player Mode", so DP is also included
     LOCAL_BATTLE,   // separate chart objects are required
     GHOST_BATTLE,   // 
-    REPLAY,         // do not save score
 };
 
 typedef unsigned GameModeKeys; // 5 7 9 10 14
 
-enum class eModChart: uint8_t
+enum class eModRandom: uint8_t
 {
     NONE = 0,
     MIRROR,
@@ -130,21 +128,22 @@ enum class eModGauge : uint8_t
     HARD,
     DEATH,
     EASY,
-    PATTACK,
-    GATTACK,
     ASSISTEASY,
 
     GRADE_NORMAL,
-    GRADE_DEATH, // ?
+    GRADE_DEATH,
 
     EXHARD,
     GRADE_EX,
+
+    //PATTACK,
+    //GATTACK,
 };
 
-inline const uint8_t PLAY_MOD_ASSIST_AUTO67     = 1 << 0; // 5keys
+inline const uint8_t PLAY_MOD_ASSIST_AUTO67     = 1 << 0; // 5keys, not implemented
 inline const uint8_t PLAY_MOD_ASSIST_AUTOSCR    = 1 << 1; // 
-inline const uint8_t PLAY_MOD_ASSIST_LEGACY     = 1 << 2; // LN -> note
-inline const uint8_t PLAY_MOD_ASSIST_NOMINES    = 1 << 3; // 5keys
+inline const uint8_t PLAY_MOD_ASSIST_LEGACY     = 1 << 2; // LN head -> note, not implemented
+inline const uint8_t PLAY_MOD_ASSIST_NOMINES    = 1 << 3; // from beatoraja, not implemented
 
 enum class eModHs : uint8_t
 {
@@ -155,25 +154,35 @@ enum class eModHs : uint8_t
     CONSTANT,
 };
 
-inline const uint8_t PLAY_MOD_VISUAL_SUD        = 1 << 0;
-inline const uint8_t PLAY_MOD_VISUAL_HID        = 1 << 1;
-inline const uint8_t PLAY_MOD_VISUAL_LIFT       = 1 << 2;
+enum class eModLaneEffect : uint8_t
+{
+    OFF,
+    HIDDEN,
+    SUDDEN,
+    SUDHID,
+    LIFT,
+    LIFTSUD,
+};
 
 struct PlayMod
 {
-    eModChart chart = eModChart::NONE;
+    eModRandom randomLeft = eModRandom::NONE;
+    eModRandom randomRight = eModRandom::NONE;
     eModGauge gauge = eModGauge::NORMAL;
     uint8_t assist_mask = 0;
-    eModHs hs = eModHs::NONE;
-    uint8_t visual_mask = 0;
+    eModHs hispeedFix = eModHs::NONE;
+    eModLaneEffect laneEffect = eModLaneEffect::OFF;
+    bool DPFlip = false;
 
     void clear()
     {
-        chart = eModChart::NONE;
+        randomLeft = eModRandom::NONE;
+        randomRight = eModRandom::NONE;
         gauge = eModGauge::NORMAL;
         assist_mask = 0;
-        hs = eModHs::NONE;
-        visual_mask = 0;
+        hispeedFix = eModHs::NONE;
+        laneEffect = eModLaneEffect::OFF;
+        DPFlip = false;
     }
 };
 
@@ -216,9 +225,11 @@ public:
     long long reserved[1]{ 0 };
     double reservedlf[2]{ 0.0 };
 
+    std::string replayFileName;
+
 public:
     vScore() = default;
-    virtual Type getType() { return Type::UNKNOWN; }
+    virtual Type getType() const { return Type::UNKNOWN; }
 };
 
 class ScoreBMS : public vScore
@@ -227,7 +238,7 @@ public:
     ScoreBMS() = default;
 
 public:
-    int exscore;
+    int exscore = 0;
 
     enum class Lamp
     {
@@ -241,24 +252,23 @@ public:
         FULLCOMBO,
         PERFECT,
         MAX
-    };
-    Lamp lamp;
+    } lamp = Lamp::NOPLAY;
 
-    int pgreat;
-    int great;
-    int good;
-    int bad;
-    int bpoor;
-    int miss;
-    int bp;
-    int combobreak;
+    int pgreat = 0;
+    int great = 0;
+    int good = 0;
+    int bad = 0;
+    int bpoor = 0;
+    int miss = 0;
+    int bp = 0;
+    int combobreak = 0;
 
     // extended info
     unsigned rival = 3; // win / lose / draw / noplay
     double rival_rate = 0;
-    Lamp rival_lamp;
+    Lamp rival_lamp = Lamp::NOPLAY;
 
-    virtual Type getType() override { return Type::BMS; }
+    virtual Type getType() const override { return Type::BMS; }
 };
 
 class AxisDir
@@ -283,4 +293,14 @@ public:
             dir = AXIS_NONE;
     }
     operator int() const { return dir; }
+};
+
+class Ratio
+{
+protected:
+    double _data;
+public:
+    Ratio() : Ratio(0) {}
+    Ratio(double d) { _data = std::clamp(d, 0.0, 1.0); }
+    operator double() const { return _data; }
 };
