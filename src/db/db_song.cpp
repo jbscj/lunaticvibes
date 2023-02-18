@@ -612,7 +612,7 @@ int SongDB::addSubFolder(Path path, const HashMD5& parentHash)
 
     if (!fs::is_directory(path))
     {
-        LOG_WARNING << "[SongDB] Add folder fail: path is not folder (" << path.u8string() << ")";
+        LOG_WARNING << "[SongDB] Add folder fail: path is not a directory (" << path.u8string() << ")";
         return -1;
     }
 
@@ -709,7 +709,7 @@ int SongDB::addNewFolder(const HashMD5& hash, const Path& path, const HashMD5& p
     FolderType type = FolderType::FOLDER;
     for (auto& f : std::filesystem::directory_iterator(path))
     {
-        if (analyzeChartType(f) == eChartFormat::BMS)
+        if (analyzeChartType(f) == eChartFormat::BMS || analyzeChartType(f) == eChartFormat::BMSON)
         {
             type = FolderType::SONG_BMS;
             break;  // break for
@@ -717,6 +717,7 @@ int SongDB::addNewFolder(const HashMD5& hash, const Path& path, const HashMD5& p
         // else ...
     }
 
+    // Register directory to db
     int ret;
     auto folderName = fs::weakly_canonical(path).filename();
     long long folderModifyTime = getFileLastWriteTime(path);

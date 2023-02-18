@@ -1,5 +1,6 @@
 #include "chartformat.h"
 #include "chartformat_bms.h"
+#include "chartformat_bmson.h"
 #include <fstream>
 #include "common/log.h"
 
@@ -46,6 +47,9 @@ std::shared_ptr<ChartFormatBase> ChartFormatBase::createFromFile(const Path& pat
     {
     case eChartFormat::BMS:
         return std::static_pointer_cast<ChartFormatBase>(std::make_shared<ChartFormatBMS>(filePath, randomSeed));
+
+    case eChartFormat::BMSON:
+        return std::static_pointer_cast<ChartFormatBase>(std::make_shared<ChartFormatBMSON>(filePath, randomSeed));
 
     case eChartFormat::UNKNOWN:
         LOG_WARNING << "[Chart] File type unknown: " << filePath.u8string();

@@ -36,7 +36,6 @@ public:
     {
         FOLDER,
         SONG_BMS,
-
         CUSTOM_FOLDER,
         COURSE,
         GRADE,

@@ -82,6 +82,7 @@ void ChartObjectBMS::loadBMS(const ChartFormatBMS& objBms)
         seed = gPlayContext.replayMybest->randomSeed;
     std::mt19937_64 rng(seed);
 
+    // Generate lane configurations
     if (gPlayContext.isBattle && _playerSlot == PLAYER_SLOT_TARGET)
     {
         // notes are loaded in 2P area, we should check randomRight instead of randomLeft

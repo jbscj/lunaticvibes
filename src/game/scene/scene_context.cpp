@@ -248,6 +248,14 @@ void loadSongList()
                 }
                 break;
 
+                case eChartFormat::BMSON:
+                {
+                    auto p = std::reinterpret_pointer_cast<ChartFormatBMSONMeta>(f->getChart(idx));
+                    // add all charts as individual entries into list.
+                    gSelectContext.entries.push_back({ std::make_shared<EntryChart>(p, f), nullptr });
+                }
+                break;
+
                 default:
                     break;
                 }

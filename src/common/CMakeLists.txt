@@ -10,6 +10,7 @@ add_library(common STATIC
     sysutil_linux.cpp
     chartformat/chartformat.cpp
     chartformat/chartformat_bms.cpp
+    chartformat/chartformat_bmson.cpp
     entry/entry_folder.cpp
     entry/entry_song.cpp
     difficultytable/difficultytable.cpp
