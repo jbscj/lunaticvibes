@@ -53,30 +53,44 @@ int main(int argc, char* argv[])
     executablePath = Path(exePath);
     fs::current_path(executablePath);
 
-    // init curl
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-
     // init logger
     InitLogger();
+
+    // init curl
+    LOG_INFO << "Initializing libcurl...";
+    if (CURLcode ret = curl_global_init(CURL_GLOBAL_DEFAULT); ret != CURLE_OK)
+    {
+        std::stringstream ss;
+        ss << "libcurl init error: " << ret;
+        std::string str = ss.str();
+        LOG_FATAL << str;
+        panic("Error", str.c_str());
+        return -1;
+    }
+    LOG_INFO << "libcurl version: " << curl_version();
+    
 
     // load configs
     ConfigMgr::init();
     ConfigMgr::load();
     ConfigMgr::selectProfile(ConfigMgr::get('E', cfg::E_PROFILE, cfg::PROFILE_DEFAULT));
+    SetLogLevel(ConfigMgr::get("E", cfg::E_LOG_LEVEL, 1));
 
     Path lr2path = Path(utf8_to_utf32(convertLR2Path(ConfigMgr::get('E', cfg::E_LR2PATH, "."), "LR2Files/")));
     if (!fs::is_directory(lr2path))
     {
-        LOG_ERROR << "LR2files directory not found! " << lr2path.u8string();
+        LOG_FATAL << "LR2files directory not found! " << lr2path.u8string();
         panic("Error", "LR2files directory not found!");
         return -1;
     }
 
     // init imgui
+    LOG_INFO << "Initializing ImGui...";
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     ImGui::StyleColorsDark();
+    LOG_INFO << "ImGui version: " << ImGui::GetVersion();
 
     {
         ImGuiStyle& s = ImGui::GetStyle();
@@ -138,7 +152,7 @@ int main(int argc, char* argv[])
     Path imguiFontPath = getSysFontPath(NULL, &fontIndex, i18n::getCurrentLanguage());
     if (!fs::exists(imguiFontPath))
     {
-        LOG_ERROR << "Font file not found. Please reinstall the game.";
+        LOG_FATAL << "Font file not found. Please reinstall the game.";
         panic("Error", "Font file not found. Please reinstall the game.");
         return -1;
     }
@@ -200,7 +214,7 @@ int main(int argc, char* argv[])
     // arg parsing
     if (argc >= 2)
     {
-        gNextScene = eScene::PLAY;
+        gNextScene = SceneType::PLAY;
         gQuitOnFinish = true;
 
         std::shared_ptr<ChartFormatBMS> bms = std::make_shared<ChartFormatBMS>(argv[1], std::time(NULL));
@@ -231,7 +245,7 @@ int main(int argc, char* argv[])
     }
     else
     {
-        gNextScene = eScene::PRE_SELECT;
+        gNextScene = SceneType::PRE_SELECT;
     }
 
     /*
@@ -239,7 +253,7 @@ int main(int argc, char* argv[])
     // preload all skins
     LOG_INFO << "==============================================";
     LOG_INFO << "Preload all skins";
-    for (eMode e = eMode::TITLE; e < eMode::MODE_COUNT; ++(*(int*)&e))
+    for (SkinType e = SkinType::TITLE; e < SkinType::MODE_COUNT; ++(*(int*)&e))
     {
         SkinMgr::load(e);
     }
@@ -254,7 +268,7 @@ int main(int argc, char* argv[])
     HRESULT oleInitializeResult = OleInitialize(NULL);
     if (oleInitializeResult < 0)
     {
-        LOG_WARNING << "OleInitialize Failed";
+        LOG_ERROR << "OleInitialize Failed";
     }
 #endif
     
@@ -312,10 +326,10 @@ void mainLoop()
 {
     gGenericInfo.loopStart();
 
-    eScene currentScene = eScene::NOT_INIT;
+    SceneType currentScene = SceneType::NOT_INIT;
 
     pScene scene = nullptr;
-    while (!gEventQuit && currentScene != eScene::EXIT && gNextScene != eScene::EXIT)
+    while (!gEventQuit && currentScene != SceneType::EXIT && gNextScene != SceneType::EXIT)
     {
         // Evenet handling
         event_handle();
@@ -330,7 +344,7 @@ void mainLoop()
         {
             if (sceneCustomize == nullptr)
             {
-                sceneCustomize = SceneMgr::get(eScene::CUSTOMIZE);
+                sceneCustomize = SceneMgr::get(SceneType::CUSTOMIZE);
                 sceneCustomize->loopStart();
                 sceneCustomize->inputLoopStart();
             }
@@ -340,7 +354,7 @@ void mainLoop()
                 sceneCustomize->inputLoopEnd();
                 sceneCustomize->loopEnd();
                 sceneCustomize.reset();
-                gNextScene = eScene::SELECT;
+                gNextScene = SceneType::SELECT;
             }
         }
         if (gInCustomize && gCustomizeSceneChanged || !gInCustomize && currentScene != gNextScene || gExitingCustomize)
@@ -357,7 +371,7 @@ void mainLoop()
 
             clearCustomDstOpt();
             currentScene = gNextScene;
-            if (currentScene != eScene::EXIT && currentScene != eScene::NOT_INIT)
+            if (currentScene != SceneType::EXIT && currentScene != SceneType::NOT_INIT)
             {
                 scene = SceneMgr::get(currentScene);
                 assert(scene != nullptr);

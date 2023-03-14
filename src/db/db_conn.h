@@ -32,7 +32,7 @@ private:
 public:
     SQLite() = delete;
     SQLite(const char* path, const char* tag = "UNNAMED");
-    ~SQLite();
+    virtual ~SQLite();
 
 protected:
     std::vector<std::vector<std::any>> query(const char* stmt, size_t retSize, std::initializer_list<std::any> args = {}) const;
@@ -45,4 +45,3 @@ public:
     void optimize();
     const char* errmsg() const;
 };
-

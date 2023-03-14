@@ -5,32 +5,16 @@
 
 using namespace chart;
 
-SpriteLaneVertical::SpriteLaneVertical(unsigned player, bool autoNotes, double basespeed, double lanespeed):
-	SpriteStatic(nullptr, Rect(0)), playerSlot(player), _autoNotes(autoNotes)
+SpriteLaneVertical::SpriteLaneVertical(const SpriteLaneVerticalBuilder& builder) : SpriteStatic(builder)
 {
 	_type = SpriteTypes::NOTE_VERT;
-	_basespd = basespeed * lanespeed;
+	playerSlot = builder.player;
+	_autoNotes = builder.autoNotes;
+	_basespd = builder.baseSpeed * builder.laneSpeed;
 	_hispeed = 1.0;
-	_category = NoteLaneCategory::_;
-	_index = NoteLaneIndex::_;
-
+	_category = builder.laneCategory;
+	_index = builder.laneIndex;
 	_hiddenCompatibleTexture = std::make_shared<TextureFull>(Color(128, 128, 128, 255));
-}
-
-SpriteLaneVertical::SpriteLaneVertical(pTexture texture, Rect r,
-    unsigned animFrames, unsigned frameTime, IndexTimer timer,
-	unsigned animRows, unsigned animCols, bool animVerticalIndexing,
-    unsigned player, bool autoNotes, double basespeed, double lanespeed):
-	SpriteLaneVertical(player, autoNotes, basespeed, lanespeed)
-{
-	pNote = std::make_shared<SpriteAnimated>(texture, r, animFrames, frameTime, timer, animRows, animCols, animVerticalIndexing);
-}
-
-
-void SpriteLaneVertical::setLane(NoteLaneCategory cat, NoteLaneIndex idx)
-{
-	_category = cat;
-	_index = idx;
 
 	if (_category != chart::NoteLaneCategory::EXTRA)
 	{
@@ -40,22 +24,22 @@ void SpriteLaneVertical::setLane(NoteLaneCategory cat, NoteLaneIndex idx)
 			if ((_index == chart::NoteLaneIndex::Sc1 && (gPlayContext.mods[PLAYER_SLOT_PLAYER].assist_mask & PLAY_MOD_ASSIST_AUTOSCR)) ||
 				(_index == chart::NoteLaneIndex::Sc2 && !gPlayContext.isBattle))
 			{
-				if (!_autoNotes) _hideInternal = true;
+				if (!_autoNotes) hideInternal = true;
 			}
 			else
 			{
-				if (_autoNotes) _hideInternal = true;
+				if (_autoNotes) hideInternal = true;
 			}
 			break;
 		case PLAYER_SLOT_TARGET:
 			if (_index == chart::NoteLaneIndex::Sc2 &&
 				(gPlayContext.mods[gPlayContext.isBattle ? PLAYER_SLOT_TARGET : PLAYER_SLOT_PLAYER].assist_mask & PLAY_MOD_ASSIST_AUTOSCR))
 			{
-				if (!_autoNotes) _hideInternal = true;
+				if (!_autoNotes) hideInternal = true;
 			}
 			else
 			{
-				if (_autoNotes) _hideInternal = true;
+				if (_autoNotes) hideInternal = true;
 			}
 			break;
 		default:
@@ -64,22 +48,28 @@ void SpriteLaneVertical::setLane(NoteLaneCategory cat, NoteLaneIndex idx)
 	}
 }
 
-void SpriteLaneVertical::setLoopTime(int t)
+void SpriteLaneVertical::buildNote(const SpriteAnimated::SpriteAnimatedBuilder& builder)
 {
-	SpriteStatic::setLoopTime(t);
-	if (pNote) pNote->setLoopTime(t);
+	pNote = builder.build();
 }
 
-void SpriteLaneVertical::setTrigTimer(IndexTimer t)
+
+void SpriteLaneVertical::setMotionLoopTo(int t)
 {
-	SpriteStatic::setTrigTimer(t);
-	if (pNote) pNote->setTrigTimer(t);
+	SpriteStatic::setMotionLoopTo(t);
+	if (pNote) pNote->setMotionLoopTo(t);
 }
 
-void SpriteLaneVertical::appendKeyFrame(const RenderKeyFrame& f)
+void SpriteLaneVertical::setMotionStartTimer(IndexTimer t)
 {
-	SpriteStatic::appendKeyFrame(f);
-	if (pNote) pNote->appendKeyFrame(f);
+	SpriteStatic::setMotionStartTimer(t);
+	if (pNote) pNote->setMotionStartTimer(t);
+}
+
+void SpriteLaneVertical::appendMotionKeyFrame(const MotionKeyFrame& f)
+{
+	SpriteStatic::appendMotionKeyFrame(f);
+	if (pNote) pNote->appendMotionKeyFrame(f);
 }
 
 std::pair<NoteLaneCategory, NoteLaneIndex> SpriteLaneVertical::getLane() const
@@ -89,34 +79,24 @@ std::pair<NoteLaneCategory, NoteLaneIndex> SpriteLaneVertical::getLane() const
 
 void SpriteLaneVertical::getRectSize(int& w, int& h)
 {
-	if (!pNote || pNote->_texRect.empty())
+	if (!pNote || pNote->textureRects.empty())
 	{
 		w = h = 0;
 	}
 	else
 	{
-		w = pNote->_texRect[0].w;
-		h = pNote->_texRect[0].h;
+		w = pNote->textureRects[0].w;
+		h = pNote->textureRects[0].h;
 	}
 }
 
 bool SpriteLaneVertical::update(const Time& t)
 {
-	if (_hideInternal) return false;
+	if (hideInternal) return false;
 
-	if (updateByKeyframes(t))
+	if (updateMotion(t))
 	{
-		switch (playerSlot)
-		{
-		case 0:
-			_hispeed = gPlayContext.HispeedGradientNow;
-			break;
-		case 1:
-			_hispeed = gPlayContext.isBattle ? gPlayContext.battle2PHispeedGradientNow : gPlayContext.HispeedGradientNow;
-			break;
-		default:
-			break;
-		}
+		gPlayContext.playerState[gPlayContext.isBattle ? playerSlot : PLAYER_SLOT_PLAYER].hispeedGradientNow;
 		updateNoteRect(t);
 		updateHIDDENCompatible();
 		return true;
@@ -139,7 +119,7 @@ void SpriteLaneVertical::updateNoteRect(const Time& t)
 	if (!pNote) return;
 	pNote->update(t);
 
-	if (gPlayContext.mods[playerSlot].hispeedFix != eModHs::CONSTANT)
+	if (gPlayContext.mods[playerSlot].hispeedFix != PlayModifierHispeedFixType::CONSTANT)
 	{
 		// fetch note size, c.y + c.h = judge line pos (top-left corner), -c.h = height start drawing
 		auto c = _current.rect;
@@ -189,12 +169,12 @@ void SpriteLaneVertical::draw() const
 {
 	if (isHidden()) return;
 
-    if (pNote && pNote->_pTexture && pNote->_pTexture->_loaded)
+    if (pNote && pNote->pTexture && pNote->pTexture->loaded)
 	{
 		for (const auto& r : _outRect)
 		{
-			pNote->_pTexture->draw(
-				pNote->_texRect[pNote->_selectionIdx * pNote->_animFrames + pNote->_currAnimFrame],
+			pNote->pTexture->draw(
+				pNote->textureRects[pNote->selectionIndex * pNote->animationFrames + pNote->animationFrameIndex],
 				r,
 				_current.color,
 				_current.blend, 
@@ -273,9 +253,30 @@ void SpriteLaneVertical::updateHIDDENCompatible()
 	}
 }
 
-void SpriteLaneVerticalLN::setTrigTimer(IndexTimer t)
+SpriteLaneVerticalLN::SpriteLaneVerticalLN(const SpriteLaneVerticalLNBuilder& builder): SpriteLaneVertical(builder)
 {
-	SpriteLaneVertical::setTrigTimer(t);
+	
+}
+
+void SpriteLaneVerticalLN::buildNoteHead(const SpriteAnimated::SpriteAnimatedBuilder& builder)
+{
+	return buildNote(builder);
+}
+
+void SpriteLaneVerticalLN::buildNoteBody(const SpriteAnimated::SpriteAnimatedBuilder& builder)
+{
+	pNoteBody = builder.build();
+}
+
+void SpriteLaneVerticalLN::buildNoteTail(const SpriteAnimated::SpriteAnimatedBuilder& builder)
+{
+	pNoteTail = builder.build();
+}
+
+
+void SpriteLaneVerticalLN::setMotionStartTimer(IndexTimer t)
+{
+	SpriteLaneVertical::setMotionStartTimer(t);
 
 	switch (t)
 	{
@@ -330,7 +331,7 @@ void SpriteLaneVerticalLN::updateNoteRect(const Time& t)
 	if (pNoteTail) pNoteTail->update(t);
 
 
-	if (gPlayContext.mods[playerSlot].hispeedFix != eModHs::CONSTANT)
+	if (gPlayContext.mods[playerSlot].hispeedFix != PlayModifierHispeedFixType::CONSTANT)
 	{
 		// fetch note size, c.y + c.h = judge line pos (top-left corner), -c.h = height start drawing
 		auto c = _current.rect;
@@ -499,13 +500,13 @@ void SpriteLaneVerticalLN::updateNoteRect(const Time& t)
 	if (pNoteBody)
 	{
 		pNoteBody->update(t);
-		if (pNoteBody->_animFrames > 1 && pNoteBody->_currAnimFrame == 0)
+		if (pNoteBody->animationFrames > 1 && pNoteBody->animationFrameIndex == 0)
 		{
-			pNoteBody->_currAnimFrame = 1;
+			pNoteBody->animationFrameIndex = 1;
 		}
 		if ((headExpired && !headHit) || (tailExpired && !tailHit) || !(headHit && !tailHit))
 		{
-			pNoteBody->_currAnimFrame = 0;
+			pNoteBody->animationFrameIndex = 0;
 		}
 	}
 }
@@ -518,7 +519,7 @@ void SpriteLaneVerticalLN::draw() const
 	colorMiss.a *= 0.5;
 
 	// body
-	if (pNoteBody && pNoteBody->_pTexture && pNoteBody->_pTexture->_loaded)
+	if (pNoteBody && pNoteBody->pTexture && pNoteBody->pTexture->loaded)
 	{
 		for (auto it = _outRectBody.begin(); it != _outRectBody.end(); ++it)
 		{
@@ -527,8 +528,8 @@ void SpriteLaneVerticalLN::draw() const
 			bool miss = (itNext == _outRectBody.end() && ((headExpired && !headHit) || (tailExpired && !tailHit)));
 			if (itNext == _outRectBody.end())
 			{
-				pNoteBody->_pTexture->draw(
-					pNoteBody->_texRect[pNoteBody->_selectionIdx * pNoteBody->_animFrames + pNoteBody->_currAnimFrame],
+				pNoteBody->pTexture->draw(
+					pNoteBody->textureRects[pNoteBody->selectionIndex * pNoteBody->animationFrames + pNoteBody->animationFrameIndex],
 					*it,
 					miss ? colorMiss : _current.color,
 					miss ? BlendMode::ALPHA : _current.blend,
@@ -538,8 +539,8 @@ void SpriteLaneVerticalLN::draw() const
 			}
 			else
 			{
-				pNoteBody->_pTexture->draw(
-					pNoteBody->_texRect[pNoteBody->_selectionIdx],
+				pNoteBody->pTexture->draw(
+					pNoteBody->textureRects[pNoteBody->selectionIndex],
 					*it,
 					miss ? colorMiss : _current.color,
 					miss ? BlendMode::ALPHA : _current.blend,
@@ -551,7 +552,7 @@ void SpriteLaneVerticalLN::draw() const
 	}
 
 	// head
-	if (pNote && pNote->_pTexture && pNote->_pTexture->_loaded)
+	if (pNote && pNote->pTexture && pNote->pTexture->loaded)
 	{
 		for (auto it = _outRect.begin(); it != _outRect.end(); ++it)
 		{
@@ -560,8 +561,8 @@ void SpriteLaneVerticalLN::draw() const
 			bool miss = (itNext == _outRect.end() && ((headExpired && !headHit) || (tailExpired && !tailHit)));
 			if (itNext == _outRect.end())
 			{
-				pNote->_pTexture->draw(
-					pNote->_texRect[pNote->_selectionIdx * pNote->_animFrames + pNote->_currAnimFrame],
+				pNote->pTexture->draw(
+					pNote->textureRects[pNote->selectionIndex * pNote->animationFrames + pNote->animationFrameIndex],
 					*it,
 					miss ? colorMiss : _current.color,
 					miss ? BlendMode::ALPHA : _current.blend,
@@ -571,8 +572,8 @@ void SpriteLaneVerticalLN::draw() const
 			}
 			else
 			{
-				pNote->_pTexture->draw(
-					pNote->_texRect[pNoteBody->_selectionIdx],
+				pNote->pTexture->draw(
+					pNote->textureRects[pNote->selectionIndex],
 					*it,
 					miss ? colorMiss : _current.color,
 					miss ? BlendMode::ALPHA : _current.blend,
@@ -584,7 +585,7 @@ void SpriteLaneVerticalLN::draw() const
 	}
 
 	// tail
-	if (pNoteTail && pNoteTail->_pTexture && pNoteTail->_pTexture->_loaded)
+	if (pNoteTail && pNoteTail->pTexture && pNoteTail->pTexture->loaded)
 	{
 		for (auto it = _outRectTail.begin(); it != _outRectTail.end(); ++it)
 		{
@@ -593,8 +594,8 @@ void SpriteLaneVerticalLN::draw() const
 			bool miss = (itNext == _outRectTail.end() && ((headExpired && !headHit) || (tailExpired && !tailHit)));
 			if (itNext == _outRectTail.end())
 			{
-				pNoteTail->_pTexture->draw(
-					pNoteTail->_texRect[pNoteTail->_selectionIdx * pNoteTail->_animFrames + pNoteTail->_currAnimFrame],
+				pNoteTail->pTexture->draw(
+					pNoteTail->textureRects[pNoteTail->selectionIndex * pNoteTail->animationFrames + pNoteTail->animationFrameIndex],
 					*it,
 					miss ? colorMiss : _current.color,
 					miss ? BlendMode::ALPHA : _current.blend,
@@ -604,8 +605,8 @@ void SpriteLaneVerticalLN::draw() const
 			}
 			else
 			{
-				pNoteTail->_pTexture->draw(
-					pNoteTail->_texRect[pNoteBody->_selectionIdx],
+				pNoteTail->pTexture->draw(
+					pNoteTail->textureRects[pNoteTail->selectionIndex],
 					*it,
 					miss ? colorMiss : _current.color,
 					miss ? BlendMode::ALPHA : _current.blend,

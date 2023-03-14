@@ -78,7 +78,7 @@ void imguiMonitorOption()
 	if (ImGui::Begin("Options (F3)", NULL, ImGuiWindowFlags_NoCollapse))
 	{
 		char titleBuf[32] = { 0 };
-		for (int i = 0; i <= 99; i += 20)
+		for (int i = 0; i <= 149; i += 20)
 		{
 			sprintf(titleBuf, "%d - %d", i, i + 20);
 			if (ImGui::CollapsingHeader(titleBuf))
@@ -138,7 +138,7 @@ void imguiMonitorSwitch()
 						for (int k = 0; k <= 9; ++k)
 						{
 							ImGui::TableSetColumnIndex(k);
-							ImGui::Text("% 4d%c", i + j + k, getDstOpt(i + j + k) ? '+' : ' ');
+							ImGui::Text("% 4d%c", i + j + k, State::get((IndexSwitch)(i + j + k)) ? '+' : ' ');
 						}
 					}
 					ImGui::EndTable();

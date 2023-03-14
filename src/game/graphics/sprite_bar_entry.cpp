@@ -3,157 +3,142 @@
 #include "common/entry/entry_types.h"
 #include "common/chartformat/chartformat_bms.h"
 
-int SpriteBarEntry::setBody(BarType type, pTexture texture, const Rect& rect, unsigned animFrames, unsigned frameTime,
-    IndexTimer timer, int nRows, int nCols, bool texVertSplit)
+int SpriteBarEntry::setBody(BarType type, const SpriteAnimated::SpriteAnimatedBuilder& builder)
 {
     if (static_cast<size_t>(type) >= static_cast<size_t>(BarType::TYPE_COUNT))
     {
-        LOG_WARNING << "[Sprite] BarBody type (" << int(type) << "Invalid!"
-            << " (Line " << _srcLine << ")";
+        LOG_DEBUG << "[Sprite] BarBody type (" << int(type) << "Invalid!"
+            << " (Line " << srcLine << ")";
         return 1;
     }
 
     auto idx = static_cast<size_t>(type);
 
-    sBodyOff[idx] = std::make_shared<SpriteAnimated>(
-        texture, rect, animFrames, frameTime, timer, nRows, nCols, texVertSplit);
+    sBodyOff[idx] = builder.build();
 
-    sBodyOn[idx] = std::make_shared<SpriteAnimated>(
-        texture, rect, animFrames, frameTime, timer, nRows, nCols, texVertSplit);
+    sBodyOn[idx] = builder.build();
 
     return 0;
 }
 
-int SpriteBarEntry::setFlash(pTexture texture, const Rect& rect, unsigned animFrames, unsigned frameTime,
-    IndexTimer timer, int nRows, int nCols, bool texVertSplit)
+int SpriteBarEntry::setFlash(const SpriteAnimated::SpriteAnimatedBuilder& builder)
 {
-    sFlash = std::make_shared<SpriteAnimated>(texture, rect, animFrames, frameTime, timer, nRows, nCols, texVertSplit);
+    sFlash = builder.build();
     return 0;
 }
 
-int SpriteBarEntry::setLevel(BarLevelType type, pTexture texture, const Rect& rect, NumberAlign align, unsigned digits,
-    unsigned numRows, unsigned numCols, unsigned frameTime, IndexTimer animtimer,
-    unsigned animFrames, bool texVertSplit)
+int SpriteBarEntry::setLevel(BarLevelType type, const SpriteNumber::SpriteNumberBuilder& builder)
 {
     if (static_cast<size_t>(type) >= static_cast<size_t>(BarLevelType::LEVEL_TYPE_COUNT))
     {
-        LOG_WARNING << "[Sprite] BarEntry level type (" << int(type) << "Invalid!"
-            << " (Line " << _srcLine << ")";
+        LOG_DEBUG << "[Sprite] BarEntry level type (" << int(type) << "Invalid!"
+            << " (Line " << srcLine << ")";
         return 1;
     }
 
-    if (digits < 3 && type == BarLevelType::IRRANK)
-        LOG_WARNING << "[Sprite] BarEntry level digit (" << digits << ") not enough for IRRANK "
-            << " (Line " << _srcLine << ")";
-    else if (digits < 2)
-        LOG_WARNING << "[Sprite] BarEntry level digit (" << digits << ") not enough for idx " << int(type)
-            << " (Line " << _srcLine << ")";
+    if (builder.maxDigits < 3 && type == BarLevelType::IRRANK)
+        LOG_DEBUG << "[Sprite] BarEntry level digit (" << builder.maxDigits << ") not enough for IRRANK "
+            << " (Line " << srcLine << ")";
+    else if (builder.maxDigits < 2)
+        LOG_DEBUG << "[Sprite] BarEntry level digit (" << builder.maxDigits << ") not enough for idx " << int(type)
+            << " (Line " << srcLine << ")";
 
-    sLevel[static_cast<size_t>(type)] = std::make_shared<SpriteNumber>(
-        texture, rect, align, digits, numRows, numCols, frameTime, IndexNumber(unsigned(IndexNumber::_SELECT_BAR_LEVEL_0) + index),
-        animtimer, animFrames, texVertSplit);
+    SpriteNumber::SpriteNumberBuilder tmpBuilder = builder;
+    tmpBuilder.numInd = IndexNumber(unsigned(IndexNumber::_SELECT_BAR_LEVEL_0) + index);
+    sLevel[static_cast<size_t>(type)] = tmpBuilder.build();
     return 0;
 }
 
-int SpriteBarEntry::setLamp(BarLampType type, pTexture texture, const Rect& rect, unsigned animFrames, unsigned frameTime,
-    IndexTimer timer, int nRows, int nCols, bool texVertSplit)
+int SpriteBarEntry::setLamp(BarLampType type, const SpriteAnimated::SpriteAnimatedBuilder& builder)
 {
     if (static_cast<size_t>(type) >= static_cast<size_t>(BarLampType::LAMP_TYPE_COUNT))
     {
-        LOG_WARNING << "[Sprite] BarEntry lamp type (" << int(type) << "Invalid!"
-            << " (Line " << _srcLine << ")";
+        LOG_DEBUG << "[Sprite] BarEntry lamp type (" << int(type) << "Invalid!"
+            << " (Line " << srcLine << ")";
         return 1;
     }
 
-    sLamp[static_cast<size_t>(type)] = std::make_shared<SpriteAnimated>(
-        texture, rect, animFrames, frameTime, timer, nRows, nCols, texVertSplit);
+    sLamp[static_cast<size_t>(type)] = builder.build();
     return 0;
 }
 
-int SpriteBarEntry::setTitle(BarTitleType type, pFont f, TextAlign align, unsigned ptsize, Color c)
+int SpriteBarEntry::setTitle(BarTitleType type, const SpriteText::SpriteTextBuilder& builder)
 {
-    const size_t i = int(IndexText::_SELECT_BAR_TITLE_FULL_0) + index;
-    sTitle[static_cast<size_t>(type)] = std::make_shared<SpriteText>(f, IndexText(i), align, ptsize, c);
+    SpriteText::SpriteTextBuilder tmpBuilder = builder;
+    tmpBuilder.textInd = IndexText(int(IndexText::_SELECT_BAR_TITLE_FULL_0) + index);
+    sTitle[static_cast<size_t>(type)] = tmpBuilder.build();
     return 0;
 }
 
-int SpriteBarEntry::setTitle(BarTitleType type, std::vector<pTexture>& textures, CharMappingList* chrList,
-    TextAlign align, unsigned height, int margin)
+int SpriteBarEntry::setTitle(BarTitleType type, const SpriteImageText::SpriteImageTextBuilder& builder)
 {
-    const size_t i = int(IndexText::_SELECT_BAR_TITLE_FULL_0) + index;
-    sTitle[static_cast<size_t>(type)] = std::make_shared<SpriteImageText>(textures, chrList, IndexText(i), align, height, margin);
+    SpriteImageText::SpriteImageTextBuilder tmpBuilder = builder;
+    tmpBuilder.textInd = IndexText(int(IndexText::_SELECT_BAR_TITLE_FULL_0) + index);
+    sTitle[static_cast<size_t>(type)] = tmpBuilder.build();
     return 0;
 }
 
-int SpriteBarEntry::setRank(BarRankType type, pTexture texture, const Rect& rect, unsigned animFrames, unsigned frameTime,
-    IndexTimer timer, int nRows, int nCols, bool texVertSplit)
+int SpriteBarEntry::setRank(BarRankType type, const SpriteAnimated::SpriteAnimatedBuilder& builder)
 {
     if (static_cast<size_t>(type) >= static_cast<size_t>(BarRankType::RANK_TYPE_COUNT))
     {
-        if (_srcLine >= 0)
+        if (srcLine >= 0)
         {
-            LOG_WARNING << "[Sprite] BarEntry rank type (" << int(type) << "Invalid!"
-                << " (Line " << _srcLine << ")";
+            LOG_DEBUG << "[Sprite] BarEntry rank type (" << int(type) << "Invalid!"
+                << " (Line " << srcLine << ")";
         }
         return 1;
     }
 
-    sRank[static_cast<size_t>(type)] = std::make_shared<SpriteAnimated>(
-        texture, rect, animFrames, frameTime, timer, nRows, nCols, texVertSplit);
+    sRank[static_cast<size_t>(type)] = builder.build();
     return 0;
 }
 
-int SpriteBarEntry::setRivalWinLose(BarRivalType type, pTexture texture, const Rect& rect, unsigned animFrames, unsigned frameTime,
-    IndexTimer timer, int nRows, int nCols, bool texVertSplit)
+int SpriteBarEntry::setRivalWinLose(BarRivalType type, const SpriteAnimated::SpriteAnimatedBuilder& builder)
 {
     if (static_cast<size_t>(type) >= static_cast<size_t>(BarRivalType::RIVAL_TYPE_COUNT))
     {
-        if (_srcLine >= 0)
+        if (srcLine >= 0)
         {
-            LOG_WARNING << "[Sprite] BarEntry rival type (" << int(type) << ") Invalid!"
-                << " (Line " << _srcLine << ")";
+            LOG_DEBUG << "[Sprite] BarEntry rival type (" << int(type) << ") Invalid!"
+                << " (Line " << srcLine << ")";
         }
         return 1;
     }
 
-    sRivalWinLose[static_cast<size_t>(type)] = std::make_shared<SpriteAnimated>(
-        texture, rect, animFrames, frameTime, timer, nRows, nCols, texVertSplit);
+    sRivalWinLose[static_cast<size_t>(type)] = builder.build();
     return 0;
 }
 
-int SpriteBarEntry::setRivalLampSelf(BarLampType type, pTexture texture, const Rect& rect, unsigned animFrames, unsigned frameTime,
-    IndexTimer timer, int nRows, int nCols, bool texVertSplit)
+int SpriteBarEntry::setRivalLampSelf(BarLampType type, const SpriteAnimated::SpriteAnimatedBuilder& builder)
 {
     if (static_cast<size_t>(type) >= static_cast<size_t>(BarLampType::LAMP_TYPE_COUNT))
     {
-        if (_srcLine >= 0)
+        if (srcLine >= 0)
         {
-            LOG_WARNING << "[Sprite] BarEntry rival lamp self type (" << int(type) << "Invalid!"
-                << " (Line " << _srcLine << ")";
+            LOG_DEBUG << "[Sprite] BarEntry rival lamp self type (" << int(type) << "Invalid!"
+                << " (Line " << srcLine << ")";
         }
         return 1;
     }
 
-    sRivalLampSelf[static_cast<size_t>(type)] = std::make_shared<SpriteAnimated>(
-        texture, rect, animFrames, frameTime, timer, nRows, nCols, texVertSplit);
+    sRivalLampSelf[static_cast<size_t>(type)] = builder.build();
     return 0;
 }
 
-int SpriteBarEntry::setRivalLampRival(BarLampType type, pTexture texture, const Rect& rect, unsigned animFrames, unsigned frameTime,
-    IndexTimer timer, int nRows, int nCols, bool texVertSplit)
+int SpriteBarEntry::setRivalLampRival(BarLampType type, const SpriteAnimated::SpriteAnimatedBuilder& builder)
 {
     if (static_cast<size_t>(type) >= static_cast<size_t>(BarLampType::LAMP_TYPE_COUNT))
     {
-        if (_srcLine >= 0)
+        if (srcLine >= 0)
         {
-            LOG_WARNING << "[Sprite] BarEntry rival lamp rival type (" << int(type) << "Invalid!"
-                << " (Line " << _srcLine << ")";
+            LOG_DEBUG << "[Sprite] BarEntry rival lamp rival type (" << int(type) << "Invalid!"
+                << " (Line " << srcLine << ")";
         }
         return 1;
     }
 
-    sRivalLampRival[static_cast<size_t>(type)] = std::make_shared<SpriteAnimated>(
-        texture, rect, animFrames, frameTime, timer, nRows, nCols, texVertSplit);
+    sRivalLampRival[static_cast<size_t>(type)] = builder.build();
     return 0;
 }
 
@@ -181,10 +166,10 @@ bool SpriteBarEntry::update(Time time)
     auto& list = gSelectContext.entries;
     if (!list.empty())
     {
-        size_t listidx = gSelectContext.idx + index;
-        if (listidx < gSelectContext.cursor)
-            listidx += list.size() * ((gSelectContext.cursor - listidx) / list.size() + 1);
-        listidx -= gSelectContext.cursor;
+        size_t listidx = gSelectContext.selectedEntryIndex + index;
+        if (listidx < gSelectContext.highlightBarIndex)
+            listidx += list.size() * ((gSelectContext.highlightBarIndex - listidx) / list.size() + 1);
+        listidx -= gSelectContext.highlightBarIndex;
         listidx %= list.size();
 
         _draw = true;
@@ -205,7 +190,7 @@ bool SpriteBarEntry::update(Time time)
         drawRivalLampRivalType = 0;
 
         auto [pEntry, pScore] = list[listidx];
-        drawBodyOn = (index == gSelectContext.cursor);
+        drawBodyOn = (index == gSelectContext.highlightBarIndex);
 
         // check new song
         bool isNewEntry = false;
@@ -240,7 +225,7 @@ bool SpriteBarEntry::update(Time time)
         {
             barTypeIdx = (size_t)BarType::NEW_SONG;
         }
-        pSprite pBody = nullptr;
+        std::shared_ptr<SpriteBase> pBody = nullptr;
         if (!drawBodyOn && sBodyOff[barTypeIdx])
         {
             if (!sBodyOff[barTypeIdx]->update(time))
@@ -269,7 +254,7 @@ bool SpriteBarEntry::update(Time time)
             return false;
         }
 
-        const auto&& parentRenderParam = pBody->getCurrentRenderParams();
+        const auto& parentRenderParam = pBody->_current;
         _current.rect = parentRenderParam.rect;
         _current.color = parentRenderParam.color;
         _current.angle = parentRenderParam.angle;
@@ -283,7 +268,7 @@ bool SpriteBarEntry::update(Time time)
             drawTitle = true;
         }
 
-        drawFlash = gSelectContext.cursor == index;
+        drawFlash = gSelectContext.highlightBarIndex == index;
         if (drawFlash && sFlash)
         {
             sFlash->update(time);
@@ -396,11 +381,11 @@ bool SpriteBarEntry::update(Time time)
                                 drawRank = true;
                             }
                             // win/lose/draw
-                            if ((size_t)score->rival < sRivalWinLose.size() && sRivalWinLose[score->rival])
+                            if ((size_t)score->rival_win < sRivalWinLose.size() && sRivalWinLose[score->rival_win])
                             {
-                                sRivalWinLose[score->rival]->update(time);
-                                sRivalWinLose[score->rival]->setHideInternal(false);
-                                drawRivalType = score->rival;
+                                sRivalWinLose[score->rival_win]->update(time);
+                                sRivalWinLose[score->rival_win]->setHideInternal(false);
+                                drawRivalType = score->rival_win;
                                 drawRival = true;
                             }
                             // rival lamp
@@ -499,21 +484,21 @@ bool SpriteBarEntry::update(Time time)
 }
 
 
-void SpriteBarEntry::setLoopTime(int t)
+void SpriteBarEntry::setMotionLoopTo(int t)
 {
-    LOG_ERROR << "[Sprite] setLoopTime(f) of SpriteBarEntry should not be used";
+    LOG_ERROR << "[Sprite] setMotionLoopTo(f) of SpriteBarEntry should not be used";
     assert(false);
 }
 
-void SpriteBarEntry::setTrigTimer(IndexTimer t)
+void SpriteBarEntry::setMotionStartTimer(IndexTimer t)
 {
-    LOG_ERROR << "[Sprite] setTrigTimer(f) of SpriteBarEntry should not be used";
+    LOG_ERROR << "[Sprite] setMotionStartTimer(f) of SpriteBarEntry should not be used";
     assert(false);
 }
 
-void SpriteBarEntry::appendKeyFrame(const RenderKeyFrame& f)
+void SpriteBarEntry::appendMotionKeyFrame(const MotionKeyFrame& f)
 {
-    LOG_ERROR << "[Sprite] appendKeyFrame(f) of SpriteBarEntry should not be used";
+    LOG_ERROR << "[Sprite] appendMotionKeyFrame(f) of SpriteBarEntry should not be used";
     assert(false);
 }
 
@@ -530,25 +515,25 @@ void SpriteBarEntry::setRectOffsetAnim(float x, float y)
     };
 
     if (drawBodyOn)
-        adjust_rect(sBodyOn[drawBodyType]->getCurrentRenderParamsRef().rect, x, y);
+        adjust_rect(sBodyOn[drawBodyType]->_current.rect, x, y);
     else
-        adjust_rect(sBodyOff[drawBodyType]->getCurrentRenderParamsRef().rect, x, y);
+        adjust_rect(sBodyOff[drawBodyType]->_current.rect, x, y);
 
     if (drawTitle)
     {
-        adjust_rect(sTitle[drawTitleType]->getCurrentRenderParamsRef().rect, x, y);
+        adjust_rect(sTitle[drawTitleType]->_current.rect, x, y);
         sTitle[drawTitleType]->updateTextRect();
     }
     if (drawLevel)
     {
-        adjust_rect(sLevel[drawLevelType]->getCurrentRenderParamsRef().rect, x, y);
+        adjust_rect(sLevel[drawLevelType]->_current.rect, x, y);
         sLevel[drawLevelType]->updateNumberRect();
     }
-    if (drawLamp) adjust_rect(sLamp[drawLampType]->getCurrentRenderParamsRef().rect, x, y);
-    if (drawRank) adjust_rect(sRank[drawRankType]->getCurrentRenderParamsRef().rect, x, y);
-    if (drawRival) adjust_rect(sRivalWinLose[drawRivalType]->getCurrentRenderParamsRef().rect, x, y);
-    if (drawRivalLampSelf) adjust_rect(sRivalLampSelf[drawRivalLampSelfType]->getCurrentRenderParamsRef().rect, x, y);
-    if (drawRivalLampRival) adjust_rect(sRivalLampRival[drawRivalLampRivalType]->getCurrentRenderParamsRef().rect, x, y);
+    if (drawLamp) adjust_rect(sLamp[drawLampType]->_current.rect, x, y);
+    if (drawRank) adjust_rect(sRank[drawRankType]->_current.rect, x, y);
+    if (drawRival) adjust_rect(sRivalWinLose[drawRivalType]->_current.rect, x, y);
+    if (drawRivalLampSelf) adjust_rect(sRivalLampSelf[drawRivalLampSelfType]->_current.rect, x, y);
+    if (drawRivalLampRival) adjust_rect(sRivalLampRival[drawRivalLampRivalType]->_current.rect, x, y);
 }
 
 void SpriteBarEntry::setRectOffsetBarIndex(float x, float y)
@@ -561,20 +546,20 @@ void SpriteBarEntry::setRectOffsetBarIndex(float x, float y)
 
     if (drawTitle)
     {
-        adjust_rect(sTitle[drawTitleType]->getCurrentRenderParamsRef().rect, x, y);
+        adjust_rect(sTitle[drawTitleType]->_current.rect, x, y);
         sTitle[drawTitleType]->updateTextRect();
     }
     if (drawLevel)
     {
-        adjust_rect(sLevel[drawLevelType]->getCurrentRenderParamsRef().rect, x, y);
+        adjust_rect(sLevel[drawLevelType]->_current.rect, x, y);
         sLevel[drawLevelType]->updateNumberRect();
     }
-    if (drawFlash) adjust_rect(sFlash->getCurrentRenderParamsRef().rect, x, y);
-    if (drawLamp) adjust_rect(sLamp[drawLampType]->getCurrentRenderParamsRef().rect, x, y);
-    if (drawRank) adjust_rect(sRank[drawRankType]->getCurrentRenderParamsRef().rect, x, y);
-    if (drawRival) adjust_rect(sRivalWinLose[drawRivalType]->getCurrentRenderParamsRef().rect, x, y);
-    if (drawRivalLampSelf) adjust_rect(sRivalLampSelf[drawRivalLampSelfType]->getCurrentRenderParamsRef().rect, x, y);
-    if (drawRivalLampRival) adjust_rect(sRivalLampRival[drawRivalLampRivalType]->getCurrentRenderParamsRef().rect, x, y);
+    if (drawFlash) adjust_rect(sFlash->_current.rect, x, y);
+    if (drawLamp) adjust_rect(sLamp[drawLampType]->_current.rect, x, y);
+    if (drawRank) adjust_rect(sRank[drawRankType]->_current.rect, x, y);
+    if (drawRival) adjust_rect(sRivalWinLose[drawRivalType]->_current.rect, x, y);
+    if (drawRivalLampSelf) adjust_rect(sRivalLampSelf[drawRivalLampSelfType]->_current.rect, x, y);
+    if (drawRivalLampRival) adjust_rect(sRivalLampRival[drawRivalLampRivalType]->_current.rect, x, y);
 }
 
 bool SpriteBarEntry::OnClick(int x, int y)
@@ -584,9 +569,9 @@ bool SpriteBarEntry::OnClick(int x, int y)
     if (_current.rect.x <= x && x < _current.rect.x + _current.rect.w &&
         _current.rect.y <= y && y < _current.rect.y + _current.rect.h)
     {
-        if (gSelectContext.cursor == index)
+        if (gSelectContext.highlightBarIndex == index)
         {
-            gSelectContext.cursorEnter = true;
+            gSelectContext.cursorEnterPending = true;
         }
         else
         {
@@ -596,10 +581,10 @@ bool SpriteBarEntry::OnClick(int x, int y)
             }
             else
             {
-                if (gSelectContext.cursor > index)
-                    gSelectContext.cursorClickScroll = (gSelectContext.cursor - index);
+                if (gSelectContext.highlightBarIndex > index)
+                    gSelectContext.cursorClickScroll = (gSelectContext.highlightBarIndex - index);
                 else
-                    gSelectContext.cursorClickScroll = -(index - gSelectContext.cursor);
+                    gSelectContext.cursorClickScroll = -(index - gSelectContext.highlightBarIndex);
             }
         }
         return true;

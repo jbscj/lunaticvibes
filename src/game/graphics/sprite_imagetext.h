@@ -2,21 +2,21 @@
 
 #include "sprite.h"
 
-#include <map>
+#include <unordered_map>
 
 struct CharMapping
 {
     size_t textureIdx;
     Rect textureRect;
 };
-using CharMappingList = std::map<char32_t, CharMapping>;
+using CharMappingList = std::unordered_map<char32_t, CharMapping>;
 
 class SpriteImageText : public SpriteText
 {
 protected:
-    std::vector<pTexture> _textures;
+    std::vector<std::shared_ptr<Texture>> _textures;
     CharMappingList* _chrList;
-    unsigned _height;
+    unsigned textHeight;
     int _margin;
 
 private:
@@ -25,9 +25,18 @@ private:
     Rect _drawRect;
 
 public:
+    struct SpriteImageTextBuilder : SpriteTextBuilder
+    {
+        std::vector<std::shared_ptr<Texture>> charTextures;
+        CharMappingList* charMappingList = nullptr;
+        int height = 0;
+        int margin = 0;
+
+        std::shared_ptr<SpriteImageText> build() const { return std::make_shared<SpriteImageText>(*this); }
+    };
+public:
     SpriteImageText() = delete;
-    SpriteImageText(std::vector<pTexture>& textures, CharMappingList* chrList, IndexText textInd = IndexText::INVALID, TextAlign align = TEXT_ALIGN_LEFT, unsigned height = 72, int margin = 0);
-    //SpriteText(pFont f, Rect rect, IndexText textInd = IndexText::INVALID, TextAlign align = TEXT_ALIGN_LEFT, unsigned ptsize = 72, Color c = 0xffffffff);
+    SpriteImageText(const SpriteImageTextBuilder& builder);
     virtual ~SpriteImageText() = default;
 
 public:
@@ -36,5 +45,5 @@ public:
     virtual void draw() const;
 
 private:
-    void setInputBindingText(std::string&& text);
+    void updateTextTexture(std::string&& text);
 };

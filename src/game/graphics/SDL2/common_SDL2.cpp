@@ -143,9 +143,10 @@ Image::Image(const char* format, void* data, size_t size):
 
 Image::Image(const char* path, std::shared_ptr<SDL_RWops>&& rw): _path(path), _pRWop(rw)
 {
-    if (!_pRWop && strlen(path) > 0)
+    if (!_pRWop && !_path.empty())
     {
-        LOG_WARNING << "[Image] Load image file error! " << SDL_GetError();
+        if (_path != "dummy")
+            LOG_WARNING << "[Image] Load image file error! " << SDL_GetError();
         return;
     }
     if (isTGA(path))
@@ -188,7 +189,7 @@ Image::Image(const char* path, std::shared_ptr<SDL_RWops>&& rw): _path(path), _p
         _haveAlphaLayer = true;
     }
 
-    _loaded = true;
+    loaded = true;
     //LOG_DEBUG << "[Image] Load image file finished. " << _path.c_str();
 }
 
@@ -226,18 +227,18 @@ Rect Image::getRect() const
 
 Texture::Texture(const Image& srcImage)
 {
-    if (!srcImage._loaded) return;
+    if (!srcImage.loaded) return;
 
     _pTexture = std::shared_ptr<SDL_Texture>(
         pushAndWaitMainThreadTask<SDL_Texture*>(std::bind(SDL_CreateTextureFromSurface, gFrameRenderer, &*srcImage._pSurface)),
         std::bind(pushAndWaitMainThreadTask<void, SDL_Texture*>, SDL_DestroyTexture, _1));
     if (_pTexture)
     {
-        _texRect = srcImage.getRect();
-        _loaded = true;
+        textureRect = srcImage.getRect();
+        loaded = true;
     }
 
-    if (!_loaded)
+    if (!loaded)
     {
         LOG_WARNING << "[Texture] Build texture object error! " << srcImage._path.c_str();
         LOG_WARNING << "[Texture] ^ " << SDL_GetError();
@@ -254,8 +255,8 @@ Texture::Texture(const SDL_Surface* pSurface)
         pushAndWaitMainThreadTask<SDL_Texture*>(std::bind(SDL_CreateTextureFromSurface, gFrameRenderer, const_cast<SDL_Surface*>(pSurface))),
         std::bind(pushAndWaitMainThreadTask<void, SDL_Texture*>, SDL_DestroyTexture, _1));
     if (!_pTexture) return;
-    _texRect = pSurface->clip_rect;
-    _loaded = true;
+    textureRect = pSurface->clip_rect;
+    loaded = true;
 }
 
 Texture::Texture(const SDL_Texture* pTexture, int w, int h)
@@ -264,8 +265,8 @@ Texture::Texture(const SDL_Texture* pTexture, int w, int h)
         const_cast<SDL_Texture*>(pTexture), 
         std::bind(pushAndWaitMainThreadTask<void, SDL_Texture*>, SDL_DestroyTexture, _1));
     if (!pTexture) return;
-    _texRect = {0, 0, w, h};
-    _loaded = true;
+    textureRect = {0, 0, w, h};
+    loaded = true;
 }
 
 Texture::Texture(int w, int h, PixelFormat fmt, bool target)
@@ -298,8 +299,8 @@ Texture::Texture(int w, int h, PixelFormat fmt, bool target)
             std::bind(pushAndWaitMainThreadTask<void, SDL_Texture*>, SDL_DestroyTexture, _1));
         if (_pTexture)
         {
-            _texRect = { 0, 0, w, h };
-            _loaded = true;
+            textureRect = { 0, 0, w, h };
+            loaded = true;
         }
 	}
 }
@@ -312,7 +313,7 @@ int Texture::updateYUV(uint8_t* Y, int Ypitch, uint8_t* U, int Upitch, uint8_t* 
 {
     assert(IsMainThread());
 
-    if (!_loaded) return -1;
+    if (!loaded) return -1;
     if (!Ypitch || !Upitch || !Vpitch) return -2;
     return SDL_UpdateYUVTexture(
         &*_pTexture, nullptr,
@@ -458,8 +459,8 @@ void Texture::draw(const Rect& srcRect, RectF dstRect,
     const Color c, const BlendMode b, const bool filter, const double angle) const
 {
     Rect srcRectTmp(srcRect);
-    if (srcRectTmp.w == RECT_FULL.w) srcRectTmp.w = _texRect.w;
-    if (srcRectTmp.h == RECT_FULL.h) srcRectTmp.h = _texRect.h;
+    if (srcRectTmp.w == RECT_FULL.w) srcRectTmp.w = textureRect.w;
+    if (srcRectTmp.h == RECT_FULL.h) srcRectTmp.h = textureRect.h;
     _draw(_pTexture, &srcRectTmp, dstRect, c, b, filter, angle, NULL);
 }
 
@@ -467,8 +468,8 @@ void Texture::draw(const Rect& srcRect, RectF dstRect,
     const Color c, const BlendMode b, const bool filter, const double angle, const Point& center) const
 {
     Rect srcRectTmp(srcRect);
-    if (srcRectTmp.w == RECT_FULL.w) srcRectTmp.w = _texRect.w;
-    if (srcRectTmp.h == RECT_FULL.h) srcRectTmp.h = _texRect.h;
+    if (srcRectTmp.w == RECT_FULL.w) srcRectTmp.w = textureRect.w;
+    if (srcRectTmp.h == RECT_FULL.h) srcRectTmp.h = textureRect.h;
     _draw(_pTexture, &srcRectTmp, dstRect, c, b, filter, angle, &center);
 }
 
@@ -480,14 +481,14 @@ TextureFull::TextureFull(const Color& c): Texture(nullptr)
     pushAndWaitMainThreadTask<void>([this, &c]()
         {
             auto surface = SDL_CreateRGBSurfaceWithFormat(0, 1, 1, 24, SDL_PIXELFORMAT_RGB24);
-            _texRect = { 0,0,1,1 };
-            SDL_FillRect(&*surface, &_texRect, SDL_MapRGBA(surface->format, c.r, c.g, c.b, c.a));
+            textureRect = { 0,0,1,1 };
+            SDL_FillRect(&*surface, &textureRect, SDL_MapRGBA(surface->format, c.r, c.g, c.b, c.a));
             _pTexture = std::shared_ptr<SDL_Texture>(
                 pushAndWaitMainThreadTask<SDL_Texture*>(std::bind(SDL_CreateTextureFromSurface, gFrameRenderer, surface)),
                 std::bind(pushAndWaitMainThreadTask<void, SDL_Texture*>, SDL_DestroyTexture, _1));
             SDL_FreeSurface(surface);
         });
-    _loaded = true;
+    loaded = true;
 }
 
 TextureFull::TextureFull(const Image& srcImage) : Texture(srcImage) {}
@@ -554,7 +555,7 @@ void TextureFull::draw(const Rect& ignored, RectF dstRect,
     SDL_RenderCopyExF(
         gFrameRenderer,
         &*_pTexture,
-        &_texRect, &dstRect,
+        &textureRect, &dstRect,
         angle,
         NULL, SDL_FLIP_NONE
     );

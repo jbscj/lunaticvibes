@@ -6,11 +6,11 @@
 RulesetBMSAuto::RulesetBMSAuto(
     std::shared_ptr<ChartFormatBase> format,
     std::shared_ptr<ChartObjectBase> chart,
-    eModGauge gauge,
+    PlayModifierGaugeType gauge,
     GameModeKeys keys,
     JudgeDifficulty difficulty,
     double health,
-    PlaySide side) : vRuleset(format, chart), RulesetBMS(format, chart, gauge, keys, difficulty, health, side)
+    PlaySide side) : RulesetBase(format, chart), RulesetBMS(format, chart, gauge, keys, difficulty, health, side)
 {
     assert(side == PlaySide::AUTO || side == PlaySide::AUTO_DOUBLE || side == PlaySide::AUTO_2P || side == PlaySide::RIVAL);
 
@@ -345,6 +345,7 @@ void RulesetBMSAuto::fail()
     _basic.judge[JUDGE_PERFECT] = totalJudgeCount[JudgeArea::EXACT_PERFECT];
     _basic.judge[JUDGE_GREAT] = totalJudgeCount[JudgeArea::EARLY_GREAT];
     _basic.judge[JUDGE_GOOD] = totalJudgeCount[JudgeArea::EARLY_GOOD];
+    exScore = _basic.judge[JUDGE_PERFECT] * 2 + _basic.judge[JUDGE_GREAT];
 
     _basic.total_acc = notesExpired ? (100.0 * exScore / (notesExpired * 2)) : 0;
     _basic.acc = _basic.total_acc;

@@ -8,9 +8,6 @@
 #include "common/entry/entry_folder.h"
 #include "common/entry/entry_song.h"
 
-class ChartFormatBase;
-typedef std::shared_ptr<ChartFormatBase> pChartFormat;
-
 inline const HashMD5 ROOT_FOLDER_HASH = md5("", 0);
 
 /* TABLE folder:
@@ -38,7 +35,7 @@ public:
         SONG_BMS,
         CUSTOM_FOLDER,
         COURSE,
-        GRADE,
+        CLASS,
     };
 
 public:
@@ -55,13 +52,23 @@ protected:
     bool removeChart(const HashMD5& md5, const HashMD5& parent);
     
 public:
-    void preload();
-    std::vector<pChartFormat> findChartByName(const HashMD5& folder, const std::string&, unsigned limit = 1000) const;  // search from genre, version, artist, artist2, title, title2
-    std::vector<pChartFormat> findChartByHash(const HashMD5&) const;  // chart may duplicate, return a list
-    std::vector<pChartFormat> findChartFromTime(const HashMD5& folder, unsigned long long addTime) const;
+    std::vector<std::shared_ptr<ChartFormatBase>> findChartByName(const HashMD5& folder, const std::string&, unsigned limit = 1000) const;  // search from genre, version, artist, artist2, title, title2
+    std::vector<std::shared_ptr<ChartFormatBase>> findChartByHash(const HashMD5&, bool checksum = true) const;  // chart may duplicate, return a list
+    std::vector<std::shared_ptr<ChartFormatBase>> findChartFromTime(const HashMD5& folder, unsigned long long addTime) const;
+
+protected:
+    std::vector<std::vector<std::any>> songQueryPool;
+    std::unordered_map<HashMD5, std::vector<size_t>> songQueryHashMap;
+    std::unordered_map<HashMD5, std::vector<size_t>> songQueryParentMap;
+    std::vector<std::vector<std::any>> folderQueryPool;
+    std::unordered_map<HashMD5, std::vector<size_t>> folderQueryHashMap;
+    std::unordered_map<HashMD5, std::vector<size_t>> folderQueryParentMap;
+public:
+    void prepareCache();
+    void freeCache();
 
 public:
-    int addFolders(const std::vector<Path>& paths);
+    int initializeFolders(const std::vector<Path>& paths);
     int addSubFolder(Path path, const HashMD5& parent = ROOT_FOLDER_HASH);
     void waitLoadingFinish();
     int removeFolder(const HashMD5& hash, bool removeSong = false);
@@ -76,9 +83,9 @@ public:
     std::pair<bool, Path> getFolderPath(const HashMD5& folder) const;
     HashMD5 getFolderHash(Path path) const;
 
-    EntryFolderRegular browse(HashMD5 root, bool recursive = true);
-    EntryFolderSong browseSong(HashMD5 root);
-    EntryFolderRegular search(HashMD5 root, std::string key);
+    std::shared_ptr<EntryFolderRegular> browse(HashMD5 root, bool recursive = true);
+    std::shared_ptr<EntryFolderSong> browseSong(HashMD5 root);
+    std::shared_ptr<EntryFolderRegular> search(HashMD5 root, std::string key);
 
 private:
     void* threadPool = nullptr;

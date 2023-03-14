@@ -16,7 +16,7 @@
 #include <VersionHelpers.h>
 #endif
 
-void SceneSelect::_imguiSampleDialog()
+void SceneSelect::imguiSampleDialog()
 {
     if (imguiShow)
     {
@@ -40,23 +40,26 @@ static void HelpMarker(const char* desc)
     }
 }
 
-void SceneSelect::_imguiInit()
+void SceneSelect::imguiInit()
 {
-    _imguiRefreshProfileList();
+    imguiRefreshProfileList();
     old_profile_index = imgui_profile_index;
 
     std::string playerName = ConfigMgr::get('P', cfg::P_PLAYERNAME, "Unnamed");
     strncpy(imgui_player_name_buf, playerName.c_str(), std::max(sizeof(imgui_player_name_buf) - 1, playerName.length()));
 
-    _imguiRefreshLanguageList();
+    imguiRefreshLanguageList();
     old_language_index = imgui_language_index;
 
-    _imguiRefreshFolderList();
-    _imguiRefreshTableList();
+    imgui_log_level = ConfigMgr::get("E", cfg::E_LOG_LEVEL, 1);
+    SetLogLevel(imgui_log_level);
+
+    imguiRefreshFolderList();
+    imguiRefreshTableList();
 
     imgui_video_ssLevel = ConfigMgr::get("V", cfg::V_RES_SUPERSAMPLE, 1);
 
-    _imguiRefreshVideoDisplayResolutionList();
+    imguiRefreshVideoDisplayResolutionList();
     auto windowX = ConfigMgr::get("V", cfg::V_DISPLAY_RES_X, CANVAS_HEIGHT);
     auto windowY = ConfigMgr::get("V", cfg::V_DISPLAY_RES_Y, CANVAS_HEIGHT);
     imgui_video_display_resolution_index = -1;
@@ -94,7 +97,7 @@ void SceneSelect::_imguiInit()
     auto [count, size] = SoundMgr::getDSPBufferSize();
     imgui_audio_bufferCount = count;
     imgui_audio_bufferSize = size;
-    _imguiRefreshAudioDevices();
+    imguiRefreshAudioDevices();
     old_audio_device_index = imgui_audio_device_index;
 
     imgui_adv_scrollSpeed[0] = ConfigMgr::get("P", cfg::P_LIST_SCROLL_TIME_INITIAL, 300);
@@ -154,18 +157,18 @@ void SceneSelect::_imguiInit()
     if (imgui_folders.empty())
     {
         imguiShow = true;
-        _skin->setHandleMouseEvents(false);
+        pSkin->setHandleMouseEvents(false);
     }
 }
 
 
-void SceneSelect::_updateImgui()
+void SceneSelect::updateImgui()
 {
-    vScene::_updateImgui();
-    if (gNextScene != eScene::SELECT) return;
+    SceneBase::updateImgui();
+    if (gNextScene != SceneType::SELECT) return;
 
-    _imguiSettings();
-    _imguiArenaJoinLobbyPrompt();
+    imguiSettings();
+    imguiArenaJoinLobbyPrompt();
 }
 
 
@@ -173,7 +176,7 @@ void SceneSelect::_updateImgui()
 #include <ShlObj.h>
 #include <ShlObj_core.h>
 #endif
-void SceneSelect::_imguiSettings()
+void SceneSelect::imguiSettings()
 {
     using namespace i18nText;
 
@@ -256,25 +259,25 @@ void SceneSelect::_imguiSettings()
                     {
                         if (imgui_main_index == MENU_ARENADIAGNOSE && ImGui::BeginTabBar("##arena", ImGuiTabBarFlags_FittingPolicyScroll))
                         {
-                            _imguiPage_ArenaDiagnose();
+                            imguiPageArenaDiagnose();
                             ImGui::EndTabBar();
                         }
 
                         if (imgui_main_index == MENU_OPTIONS && ImGui::BeginTabBar("##option", ImGuiTabBarFlags_FittingPolicyScroll))
                         {
-                            _imguiPage_Options();
+                            imguiPageOptions();
                             ImGui::EndTabBar();
                         }
 
                         if (imgui_main_index == MENU_ABOUT && ImGui::BeginTabBar("##about", ImGuiTabBarFlags_FittingPolicyScroll))
                         {
-                            _imguiPage_About();
+                            imguiPageAbout();
                             ImGui::EndTabBar();
                         }
 
                         if (imgui_main_index == MENU_EXIT)
                         {
-                            _imguiPage_Exit();
+                            imguiPageExit();
                         }
                     }
                 }
@@ -314,7 +317,7 @@ void SceneSelect::_imguiSettings()
                             {
                                 memset(imgui_add_profile_buf, 0, sizeof(imgui_add_profile_buf));
                                 ImGui::CloseCurrentPopup();
-                                _imguiRefreshProfileList();
+                                imguiRefreshProfileList();
 
                                 imgui_add_profile_popup = false;
                                 imgui_add_profile_popup_error = 0;
@@ -359,13 +362,13 @@ void SceneSelect::_imguiSettings()
         ImGui::End();
     }
 
-    _imguiCheckSettings();
+    imguiCheckSettings();
 }
 
 static const float tabItemWidth = 120.f;
 static const float infoRowWidth = 240.f;
 
-void SceneSelect::_imguiPage_ArenaDiagnose()
+void SceneSelect::imguiPageArenaDiagnose()
 {
     auto& d = gArenaData;
 
@@ -488,54 +491,54 @@ void SceneSelect::_imguiPage_ArenaDiagnose()
     }
 }
 
-void SceneSelect::_imguiPage_Options()
+void SceneSelect::imguiPageOptions()
 {
     using namespace i18nText;
 
     ImGui::SetNextItemWidth(tabItemWidth);
     if (ImGui::BeginTabItem(i18n::c(SETTINGS_GENERAL), NULL, ImGuiTabItemFlags_NoCloseWithMiddleMouseButton))
     {
-        _imguiPage_Options_General();
+        imguiPageOptionsGeneral();
         ImGui::EndTabItem();
     }
 
     ImGui::SetNextItemWidth(tabItemWidth);
     if (ImGui::BeginTabItem(i18n::c(SETTINGS_JUKEBOX), NULL, ImGuiTabItemFlags_NoCloseWithMiddleMouseButton))
     {
-        _imguiPage_Options_Jukebox();
+        imguiPageOptionsJukebox();
         ImGui::EndTabItem();
     }
 
     ImGui::SetNextItemWidth(tabItemWidth);
     if (ImGui::BeginTabItem(i18n::c(SETTINGS_VIDEO), NULL, ImGuiTabItemFlags_NoCloseWithMiddleMouseButton))
     {
-        _imguiPage_Options_Video();
+        imguiPageOptionsVideo();
         ImGui::EndTabItem();
     }
 
     ImGui::SetNextItemWidth(tabItemWidth);
     if (ImGui::BeginTabItem(i18n::c(SETTINGS_AUDIO), NULL, ImGuiTabItemFlags_NoCloseWithMiddleMouseButton))
     {
-        _imguiPage_Options_Audio();
+        imguiPageOptionsAudio();
         ImGui::EndTabItem();
     }
 
     ImGui::SetNextItemWidth(tabItemWidth);
     if (ImGui::BeginTabItem(i18n::c(SETTINGS_PLAY), NULL, ImGuiTabItemFlags_NoCloseWithMiddleMouseButton))
     {
-        _imguiPage_Options_Play();
+        imguiPageOptionsPlay();
         ImGui::EndTabItem();
     }
 
     ImGui::SetNextItemWidth(tabItemWidth);
     if (ImGui::BeginTabItem(i18n::c(SETTINGS_SELECT), NULL, ImGuiTabItemFlags_NoCloseWithMiddleMouseButton))
     {
-        _imguiPage_Options_Select();
+        imguiPageOptionsSelect();
         ImGui::EndTabItem();
     }
 }
 
-void SceneSelect::_imguiPage_Options_General()
+void SceneSelect::imguiPageOptionsGeneral()
 {
     using namespace i18nText;
 
@@ -563,18 +566,35 @@ void SceneSelect::_imguiPage_Options_General()
         modifiedPlayName |= ImGui::Button((i18n::s(APPLY) + "##applyname").c_str());
         if (modifiedPlayName)
         {
-            _imguiApplyPlayerName();
+            imguiApplyPlayerName();
         }
 
         ImGui::Text(i18n::c(LANGUAGE));
         ImGui::SameLine(infoRowWidth);
         ImGui::Combo("##language", &imgui_language_index, imgui_languages_display.data(), (int)imgui_languages_display.size());
 
+        /////////////////////////////////////////////////////////////////////////////////////////
+
+        ImGui::Text(i18n::c(LOG_LEVEL));
+        ImGui::SameLine(infoRowWidth);
+        static const char* imgui_log_level_display[] =
+        {
+            "Debug",
+            "Info",
+            "Warning",
+            "Error"
+        };
+        if (ImGui::Combo("##loglevel", &imgui_log_level, imgui_log_level_display, sizeof(imgui_log_level_display) / sizeof(char*)))
+        {
+            SetLogLevel(imgui_log_level);
+            ConfigMgr::set('E', cfg::E_LOG_LEVEL, imgui_log_level);
+        }
+
         ImGui::EndChild();
     }
 }
 
-void SceneSelect::_imguiPage_Options_Jukebox()
+void SceneSelect::imguiPageOptionsJukebox()
 {
     using namespace i18nText;
 
@@ -592,7 +612,7 @@ void SceneSelect::_imguiPage_Options_Jukebox()
             bool enterPath = ImGui::InputTextWithHint("##folderpath", i18n::c(JUKEBOX_FOLDER_PATH_HINT), imgui_folder_path_buf, sizeof(imgui_folder_path_buf), ImGuiInputTextFlags_EnterReturnsTrue);
             if (enterPath || (ImGui::SameLine(), ImGui::Button(" + ##folder")))
             {
-                _imguiAddFolder(imgui_folder_path_buf);
+                imguiAddFolder(imgui_folder_path_buf);
                 memset(imgui_folder_path_buf, 0, sizeof(imgui_folder_path_buf));
             }
 
@@ -600,17 +620,17 @@ void SceneSelect::_imguiPage_Options_Jukebox()
 
             if (ImGui::Button(i18n::c(ADD_MORE)))
             {
-                _imguiAddFolder();
+                imguiAddFolder();
             }
             ImGui::SameLine();
             if (ImGui::Button((i18n::s(JUKEBOX_DELETE_SELECTED) + "##delfolder").c_str()))
             {
-                _imguiDelFolder();
+                imguiDelFolder();
             }
             ImGui::SameLine();
             if (ImGui::Button(i18n::c(JUKEBOX_BROWSE_SELECTED)))
             {
-                _imguiBrowseFolder();
+                imguiBrowseFolder();
             }
         }
 
@@ -624,7 +644,7 @@ void SceneSelect::_imguiPage_Options_Jukebox()
             bool enterUrl = ImGui::InputTextWithHint("##tableurl", i18n::c(JUKEBOX_TABLE_URL_HINT), imgui_table_url_buf, sizeof(imgui_table_url_buf), ImGuiInputTextFlags_EnterReturnsTrue);
             if (enterUrl || (ImGui::SameLine(), ImGui::Button(" + ##table")))
             {
-                _imguiAddTable();
+                imguiAddTable();
                 memset(imgui_table_url_buf, 0, sizeof(imgui_table_url_buf));
             }
 
@@ -632,14 +652,14 @@ void SceneSelect::_imguiPage_Options_Jukebox()
 
             if (ImGui::Button((i18n::s(JUKEBOX_DELETE_SELECTED) + "##deltable").c_str()))
             {
-                _imguiDelTable();
+                imguiDelTable();
             }
         }
         ImGui::EndChild();
     }
 }
 
-void SceneSelect::_imguiPage_Options_Video()
+void SceneSelect::imguiPageOptionsVideo()
 {
     using namespace i18nText;
 
@@ -675,7 +695,7 @@ void SceneSelect::_imguiPage_Options_Video()
         };
         if (ImGui::Combo("##window", &imgui_video_mode, imgui_video_mode_display, sizeof(imgui_video_mode_display) / sizeof(char*)))
         {
-            _imguiRefreshVideoDisplayResolutionList();
+            imguiRefreshVideoDisplayResolutionList();
         }
 
         ImGui::Text(i18n::c(VIDEO_VSYNC));
@@ -697,7 +717,7 @@ void SceneSelect::_imguiPage_Options_Video()
 
         if (ImGui::Button(i18n::c(APPLY), { 80.f, 0.f }))
         {
-            _imguiApplyResolution();
+            imguiApplyResolution();
 
             if (imgui_video_maxFPS < 30 && imgui_video_maxFPS != 0)
             {
@@ -713,7 +733,7 @@ void SceneSelect::_imguiPage_Options_Video()
     }
 }
 
-void SceneSelect::_imguiPage_Options_Audio()
+void SceneSelect::imguiPageOptionsAudio()
 {
     using namespace i18nText;
 
@@ -725,7 +745,7 @@ void SceneSelect::_imguiPage_Options_Audio()
 
         if (ImGui::Button(i18n::c(AUDIO_REFRESH_DEVICE_LIST)))
         {
-            _imguiRefreshAudioDevices();
+            imguiRefreshAudioDevices();
         }
 
         ImGui::Spacing();
@@ -740,14 +760,14 @@ void SceneSelect::_imguiPage_Options_Audio()
 
         if (ImGui::Button(i18n::c(APPLY), { 80.f, 0.f }))
         {
-            _imguiApplyAudioSettings();
+            imguiApplyAudioSettings();
         }
 
         ImGui::EndChild();
     }
 }
 
-void SceneSelect::_imguiPage_Options_Play()
+void SceneSelect::imguiPageOptionsPlay()
 {
     using namespace i18nText;
 
@@ -819,28 +839,30 @@ void SceneSelect::_imguiPage_Options_Play()
         imgui_play_lockGreenNumber = State::get(IndexSwitch::P1_LOCK_SPEED);
         if (ImGui::Checkbox(i18n::c(LOCK_GREENNUMBER), &imgui_play_lockGreenNumber))
         {
+            State::set(IndexOption::PLAY_HSFIX_TYPE, imgui_play_lockGreenNumber ? Option::SPEED_FIX_INITIAL : Option::SPEED_NORMAL);
+            State::set(IndexText::SCROLL_TYPE, Option::s_speed_type[State::get(IndexOption::PLAY_HSFIX_TYPE)]);
             State::set(IndexSwitch::P1_LOCK_SPEED, imgui_play_lockGreenNumber);
         }
 
         ImGui::BeginDisabled(imgui_play_lockGreenNumber);
         ImGui::Text(i18n::c(HISPEED));
         ImGui::SameLine(infoRowWidth);
-        imgui_play_hispeed = gPlayContext.Hispeed;
+        imgui_play_hispeed = gPlayContext.playerState[PLAYER_SLOT_PLAYER].hispeed;
         if (ImGui::SliderFloat("##hispeed", &imgui_play_hispeed, 0.01f, 10.0f, "%.02f", ImGuiSliderFlags_None))
         {
             int hsInt = int(std::round(imgui_play_hispeed * 100.0));
             State::set(IndexNumber::HS_1P, hsInt);
-            gPlayContext.Hispeed = imgui_play_hispeed = hsInt / 100.0;
+            gPlayContext.playerState[PLAYER_SLOT_PLAYER].hispeed = imgui_play_hispeed = hsInt / 100.0;
         }
         ImGui::EndDisabled();
 
         ImGui::BeginDisabled(!imgui_play_lockGreenNumber);
         ImGui::Text(i18n::c(GREENNUMBER));
         ImGui::SameLine(infoRowWidth);
-        imgui_play_greenNumber = ConfigMgr::get('P', cfg::P_GREENNUMBER, 0);
+        imgui_play_greenNumber = State::get(IndexNumber::GREEN_NUMBER_1P);
         if (ImGui::SliderInt("##greennumber", &imgui_play_greenNumber, 1, 1200, "%d", ImGuiSliderFlags_None))
         {
-            ConfigMgr::set('P', cfg::P_GREENNUMBER, imgui_play_greenNumber >= 0 ? imgui_play_greenNumber : 0);
+            State::set(IndexNumber::GREEN_NUMBER_1P, imgui_play_greenNumber >= 0 ? imgui_play_greenNumber : 0);
         }
         ImGui::SameLine();
         HelpMarker(i18n::c(GREENNUMBER_HINT));
@@ -879,7 +901,7 @@ void SceneSelect::_imguiPage_Options_Play()
     }
 }
 
-void SceneSelect::_imguiPage_Options_Select()
+void SceneSelect::imguiPageOptionsSelect()
 {
     using namespace i18nText;
 
@@ -969,7 +991,7 @@ void SceneSelect::_imguiPage_Options_Select()
     }
 }
 
-void SceneSelect::_imguiPage_About()
+void SceneSelect::imguiPageAbout()
 {
     using namespace i18nText;
 
@@ -1065,14 +1087,14 @@ Special Thanks:
     }
 }
 
-void SceneSelect::_imguiPage_Exit()
+void SceneSelect::imguiPageExit()
 {
-    gNextScene = eScene::EXIT_TRANS;
+    gNextScene = SceneType::EXIT_TRANS;
 }
 
 
 
-void SceneSelect::_imguiRefreshProfileList()
+void SceneSelect::imguiRefreshProfileList()
 {
     imgui_profile_index = -1;
     imgui_profiles.clear();
@@ -1116,7 +1138,7 @@ void SceneSelect::_imguiRefreshProfileList()
     }
 }
 
-void SceneSelect::_imguiRefreshLanguageList()
+void SceneSelect::imguiRefreshLanguageList()
 {
     imgui_languages.clear();
     imgui_languages_display.clear();
@@ -1139,7 +1161,7 @@ void SceneSelect::_imguiRefreshLanguageList()
 }
 
 
-void SceneSelect::_imguiRefreshFolderList()
+void SceneSelect::imguiRefreshFolderList()
 {
     imgui_folder_index = -1;
     imgui_folders.clear();
@@ -1151,7 +1173,7 @@ void SceneSelect::_imguiRefreshFolderList()
         imgui_folders_display.push_back(f.c_str());
 }
 
-void SceneSelect::_imguiRefreshTableList()
+void SceneSelect::imguiRefreshTableList()
 {
     imgui_table_index = -1;
     imgui_tables.clear();
@@ -1163,8 +1185,14 @@ void SceneSelect::_imguiRefreshTableList()
         imgui_tables_display.push_back(f.c_str());
 }
 
-void SceneSelect::_imguiRefreshVideoDisplayResolutionList()
+void SceneSelect::imguiRefreshVideoDisplayResolutionList()
 {
+    auto oldRes = std::make_pair<unsigned, unsigned>(0, 0);
+    if (!imgui_video_display_resolution_size.empty())
+    {
+        oldRes = imgui_video_display_resolution_size[imgui_video_display_resolution_index];
+    }
+
     imgui_video_display_resolution_size.clear();
     imgui_video_display_resolution.clear();
     imgui_video_display_resolution_display.clear();
@@ -1176,7 +1204,12 @@ void SceneSelect::_imguiRefreshVideoDisplayResolutionList()
         std::set<std::pair<int, int>> resolutions;
         for (auto& r : list)
         {
-            resolutions.insert({ std::get<0>(r), std::get<1>(r) });
+            int x = std::get<0>(r);
+            int y = std::get<1>(r);
+            if (x >= 640 && y >= 480)
+            {
+                resolutions.insert({ x, y });
+            }
         }
         for (auto& r : resolutions)
         {
@@ -1221,10 +1254,22 @@ void SceneSelect::_imguiRefreshVideoDisplayResolutionList()
         imgui_video_display_resolution_display.push_back(r.c_str());
     }
 
+    if (oldRes.first != 0)
+    {
+        for (int i = 0; i < (int)imgui_video_display_resolution_size.size(); i++)
+        {
+            auto& res = imgui_video_display_resolution_size[i];
+            if (oldRes == res)
+            {
+                imgui_video_display_resolution_index = i;
+                return;
+            }
+        }
+    }
     imgui_video_display_resolution_index = 0;
 }
 
-void SceneSelect::_imguiCheckSettings()
+void SceneSelect::imguiCheckSettings()
 {
     bool reboot = false;
 
@@ -1312,19 +1357,19 @@ void SceneSelect::_imguiCheckSettings()
     if (reboot)
     {
         imguiShow = false;
-        _skin->setHandleMouseEvents(true);
+        pSkin->setHandleMouseEvents(true);
         gSelectContext.isGoingToReboot = true;
     }
 }
 
-bool SceneSelect::_imguiApplyPlayerName()
+bool SceneSelect::imguiApplyPlayerName()
 {
     ConfigMgr::Profile()->set(cfg::P_PLAYERNAME, imgui_player_name_buf);
     State::set(IndexText::PLAYER_NAME, imgui_player_name_buf);
     return true;
 }
 
-bool SceneSelect::_imguiAddFolder(const char* path)
+bool SceneSelect::imguiAddFolder(const char* path)
 {
     bool added = false;
 
@@ -1359,6 +1404,15 @@ bool SceneSelect::_imguiAddFolder(const char* path)
     }
     else
     {
+        if (strnlen(path, 1) == 0) 
+            return false;
+
+        for (auto& f : imgui_folders)
+        {
+            if (f == path)
+                return false;
+        }
+        
         imgui_folders.push_back(path);
         imgui_folders_display.push_back(imgui_folders.back().c_str());
         imgui_folder_index = -1;
@@ -1369,7 +1423,7 @@ bool SceneSelect::_imguiAddFolder(const char* path)
     return added;
 }
 
-bool SceneSelect::_imguiDelFolder()
+bool SceneSelect::imguiDelFolder()
 {
     if (imgui_folder_index < 0 || imgui_folder_index >= imgui_folders_display.size()) return false;
 
@@ -1384,7 +1438,7 @@ bool SceneSelect::_imguiDelFolder()
     return true;
 }
 
-bool SceneSelect::_imguiBrowseFolder()
+bool SceneSelect::imguiBrowseFolder()
 {
     if (imgui_folder_index < 0 || imgui_folder_index >= imgui_folders_display.size()) return false;
 
@@ -1399,9 +1453,18 @@ bool SceneSelect::_imguiBrowseFolder()
     return true;
 }
 
-bool SceneSelect::_imguiAddTable()
+bool SceneSelect::imguiAddTable()
 {
     bool added = false;
+
+    if (strnlen(imgui_table_url_buf, 1) == 0)
+        return false;
+
+    for (auto& f : imgui_tables)
+    {
+        if (f == imgui_table_url_buf)
+            return false;
+    }
 
     imgui_tables.push_back(imgui_table_url_buf);
     imgui_tables_display.push_back(imgui_tables.back().c_str());
@@ -1417,7 +1480,7 @@ bool SceneSelect::_imguiAddTable()
     return added;
 }
 
-bool SceneSelect::_imguiDelTable()
+bool SceneSelect::imguiDelTable()
 {
     if (imgui_table_index < 0 || imgui_table_index >= imgui_tables_display.size()) return false;
 
@@ -1432,7 +1495,7 @@ bool SceneSelect::_imguiDelTable()
     return false;
 }
 
-bool SceneSelect::_imguiApplyResolution()
+bool SceneSelect::imguiApplyResolution()
 {
     const auto& [windowW, windowH] = imgui_video_display_resolution_size[imgui_video_display_resolution_index];
     auto [desktopW, desktopH] = graphics_get_desktop_resolution();
@@ -1509,7 +1572,7 @@ bool SceneSelect::_imguiApplyResolution()
     return true;
 }
 
-bool SceneSelect::_imguiRefreshAudioDevices()
+bool SceneSelect::imguiRefreshAudioDevices()
 {
     imgui_audio_device_index = -1;
     imgui_audio_devices.clear();
@@ -1545,7 +1608,7 @@ bool SceneSelect::_imguiRefreshAudioDevices()
     return false;
 }
 
-bool SceneSelect::_imguiApplyAudioSettings()
+bool SceneSelect::imguiApplyAudioSettings()
 {
     bool ret;
     ConfigMgr::set("A", cfg::A_BUFCOUNT, imgui_audio_bufferCount);
@@ -1580,7 +1643,7 @@ bool SceneSelect::_imguiApplyAudioSettings()
 #include "game/arena/arena_client.h"
 #include "game/arena/arena_host.h"
 
-bool SceneSelect::_imguiArenaJoinLobbyPrompt()
+bool SceneSelect::imguiArenaJoinLobbyPrompt()
 {
     if (imgui_show_arenaJoinLobbyPrompt)
     {
@@ -1617,7 +1680,7 @@ bool SceneSelect::_imguiArenaJoinLobbyPrompt()
                 {
                     ImGui::CloseCurrentPopup();
                     imgui_show_arenaJoinLobbyPrompt = false;
-                    _skin->setHandleMouseEvents(true);
+                    pSkin->setHandleMouseEvents(true);
                 }
 
                 ImGui::EndPopup();

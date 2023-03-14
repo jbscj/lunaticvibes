@@ -18,72 +18,75 @@ enum class ePlayState
     WAIT_ARENA,
 };
 
-class ScenePlay : public vScene
+class ScenePlay : public SceneBase
 {
 private:
 	std::future<void> _loadChartFuture;
 
 private:
-    ePlayState _state;
+    ePlayState state;
     InputMask _inputAvailable;
-    std::vector<size_t> _currentKeySample;
+    std::vector<size_t> keySampleIndex;
 
 protected:
     bool isPlaymodeDP() const;
 
 private:
-    bool _isExitingFromPlay = false;
-    std::array<bool, 2>     _isPlayerFinished{ false, false };
+    bool playInterrupted = false;
+    bool playFinished = false;
+    bool holdingStart[2]{ false, false };
+    bool holdingSelect[2]{ false, false };
+    bool isHoldingStart(int player) const;
+    bool isHoldingSelect(int player) const;
 
-    std::array<bool, 2>     _isHoldingStart = { false, false };
-    std::array<bool, 2>     _isHoldingSelect = { false, false };
-    std::array<Time, 2>     _startPressedTime = { TIMER_NEVER, TIMER_NEVER };
-    std::array<Time, 2>     _selectPressedTime = { TIMER_NEVER, TIMER_NEVER };
+    struct PlayerState
+    {
+		bool finished = false;
 
-    std::array<int, 2>      _ttAngleTime{ 0 };
-    std::array<double, 2>   _ttAngleDiff{ 0 };
+		Time startPressedTime = TIMER_NEVER;
+		Time selectPressedTime = TIMER_NEVER;
 
-    std::array<AxisDir, 2>  _scratchDir{ 0 };
-    std::array<Time, 2>     _scratchLastUpdate{ TIMER_NEVER, TIMER_NEVER };
-    std::array<double, 2>   _scratchAccumulator = { 0, 0 };
+		double turntableAngleAdd = 0;
 
-    std::array<double, 2>   _lockspeedValue{ 0 };           // internal use only, for precise calculation
-    std::array<int, 2>      _lockspeedGreenNumber{ 0 };     // green number integer
+		AxisDir scratchDirection = 0;
+		Time scratchLastUpdate = TIMER_NEVER;
+		double scratchAccumulator = 0;
 
-    std::array<int, 2>      _hispeedAdd{ 0 };
-    std::array<int, 2>      _lanecoverAdd{ 0 };
+		int hispeedAddPending = 0;
+		int lanecoverAddPending = 0;
 
-    std::array<double, 2>   _hispeedOld{ 1.0, 1.0 };
-    std::array<bool, 2>     _laneEffectHIDDEN { false, false };
-    std::array<bool, 2>     _laneEffectSUDHID { false, false };
+		double savedHispeed = 1.0;
 
-    std::array<int, 2>      _healthLastTick{ 0 };
+		Option::e_lane_effect_type origLanecoverType = Option::LANE_OFF;
 
-    Time _readyTime = 0;
+		int healthLastTick = 0;
+
+		double lockspeedValueInternal = 300.0; // internal use only, for precise calculation
+		double lockspeedHispeedBuffered = 2.0;
+		int lockspeedGreenNumber = 300; // green number integer
+
+		bool hispeedHasChanged = false;
+		bool lanecoverTopHasChanged = false;
+		bool lanecoverBottomHasChanged = false;
+		bool lanecoverStateHasChanged = false;
+		bool lockspeedResetPending = false;
+
+		int judgeBP = 0; // used for displaying poor bga
+
+    } playerState[2];
+
+    Time delayedReadyTime = 0;
     int retryRequestTick = 0;
 
     std::vector<ReplayChart::Commands>::iterator itReplayCommand;
     InputMask replayKeyPressing;
-    std::array<bool, 2>   _hispeedHasChanged{ false, false };
-    std::array<bool, 2>   _lanecoverTopHasChanged{ false, false };
-    std::array<bool, 2>   _lanecoverBottomHasChanged{ false, false };
-    std::array<bool, 2>   _lanecoverStateHasChanged{ false, false };
-    std::array<bool, 2>   _lockSpeedReset{ false, false };
     unsigned replayCmdMapIndex = 0;
 
     bool isManuallyRequestedExit = false;
     bool isReplayRequestedExit = false;
 
-    std::array<int, 2>      _missPlayer = { 0 };
-    Time _missLastTime;
-    int _missBgaLength;
-
-    bool imguiShowAdjustMenu = false;
-    int imguiAdjustBorderX = 640;
-    int imguiAdjustBorderY = 480;
-    int imguiAdjustBorderSize = 50;
-    bool imguiAdjustIsDP = false;
-    bool imguiAdjustHas2P = false;
+    Time poorBgaStartTime;
+    int poorBgaDuration;
 
     double hiSpeedMinSoft = 0.25;
     double hiSpeedMinHard = 0.01;
@@ -125,8 +128,8 @@ public:
 protected:
     // common
     void loadChart();
-	constexpr double getWavLoadProgress() { return (_wavToLoad == 0) ? (gChartContext.isSampleLoaded ? 1.0 : 0.0) : (double)_wavLoaded / _wavToLoad; }
-	constexpr double getBgaLoadProgress() { return (_bmpToLoad == 0) ? (gChartContext.isBgaLoaded ? 1.0 : 0.0) : (double)_bmpLoaded / _bmpToLoad; }
+	constexpr double getWavLoadProgress() { return (wavTotal == 0) ? (gChartContext.isSampleLoaded ? 1.0 : 0.0) : (double)wavLoaded / wavTotal; }
+	constexpr double getBgaLoadProgress() { return (bmpTotal == 0) ? (gChartContext.isBgaLoaded ? 1.0 : 0.0) : (double)bmpLoaded / bmpTotal; }
 
     void setInputJudgeCallback();
     void removeInputJudgeCallback();
@@ -134,14 +137,14 @@ protected:
 
 protected:
     // loading indicators
-    bool _chartLoaded = false;
-    bool _rulesetLoaded = false;
+    bool chartObjLoaded = false;
+    bool rulesetLoaded = false;
     //bool _sampleLoaded = false;
     //bool _bgaLoaded = false;
-    unsigned _wavLoaded = 0;
-    unsigned _wavToLoad = 0;
-    unsigned _bmpLoaded = 0;
-    unsigned _bmpToLoad = 0;
+    unsigned wavLoaded = 0;
+    unsigned wavTotal = 0;
+    unsigned bmpLoaded = 0;
+    unsigned bmpTotal = 0;
 
 protected:
     // Looper callbacks
@@ -162,6 +165,7 @@ protected:
 
 protected:
     // Inner-state updates
+    void updatePlayTime(const Time& rt);
     void procCommonNotes();
     void changeKeySampleMapping(const Time& t);
     void spinTurntable(bool startedPlaying);
@@ -174,11 +178,19 @@ protected:
     void inputGameHold(InputMask&, const Time&);
     void inputGameRelease(InputMask&, const Time&);
     void inputGamePressTimer(InputMask&, const Time&);
+    void inputGamePressPlayKeysounds(InputMask, const Time&);
     void inputGameReleaseTimer(InputMask&, const Time&);
     void inputGameAxis(double s1, double s2, const Time&);
 
 protected:
-    virtual void _updateImgui() override;
+    bool imguiShowAdjustMenu = false;
+    int imguiAdjustBorderX = 640;
+    int imguiAdjustBorderY = 480;
+    int imguiAdjustBorderSize = 50;
+    bool imguiAdjustIsDP = false;
+    bool imguiAdjustHas2P = false;
+
+    virtual void updateImgui() override;
     void imguiInit();
     void imguiAdjustMenu();
 };

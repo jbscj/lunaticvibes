@@ -10,8 +10,8 @@ extern "C"
 }
 #include "game/graphics/video.h"
 
-SpriteVideo::SpriteVideo(int w, int h, std::shared_ptr<sVideo> pVid) :
-	SpriteStatic(std::make_shared<TextureVideo>(pVid), { 0, 0, w, h }),
+SpriteVideo::SpriteVideo(int w, int h, std::shared_ptr<sVideo> pVid, int srcLine) :
+	SpriteStatic(std::make_shared<TextureVideo>(pVid), { 0, 0, w, h }, srcLine),
 	w(0), h(0), format(Texture::PixelFormat::UNKNOWN)
 {
 	_type = SpriteTypes::VIDEO;
@@ -26,14 +26,14 @@ SpriteVideo::SpriteVideo(int w, int h, std::shared_ptr<sVideo> pVid) :
 
 void SpriteVideo::startPlaying()
 {
-	auto pVid = std::reinterpret_pointer_cast<TextureVideo>(_pTexture);
+	auto pVid = std::reinterpret_pointer_cast<TextureVideo>(pTexture);
 	if (!pVid) return;
 	pVid->start();
 }
 
 void SpriteVideo::stopPlaying()
 {
-	auto pVid = std::reinterpret_pointer_cast<TextureVideo>(_pTexture);
+	auto pVid = std::reinterpret_pointer_cast<TextureVideo>(pTexture);
 	if (!pVid) return;
 	pVid->stop();
 }

@@ -11,7 +11,7 @@
 #include "game/runtime/i18n.h"
 #include "git_version.h"
 
-ScenePreSelect::ScenePreSelect(): vScene(eMode::PRE_SELECT, 240)
+ScenePreSelect::ScenePreSelect(): SceneBase(SkinType::PRE_SELECT, 240)
 {
 	_updateCallback = std::bind(&ScenePreSelect::updateLoadSongs, this);
 
@@ -26,13 +26,18 @@ ScenePreSelect::ScenePreSelect(): vScene(eMode::PRE_SELECT, 240)
 
     graphics_set_maxfps(30);
 
-    if (gNextScene == eScene::PRE_SELECT)
+    LOG_INFO << "[List] ------------------------------------------------------------";
+
+    if (gNextScene == SceneType::PRE_SELECT)
     {
         // score db
+        LOG_INFO << "[List] Initializing score.db...";
         std::string scoreDBPath = (ConfigMgr::Profile()->getPath() / "score.db").u8string();
         g_pScoreDB = std::make_shared<ScoreDB>(scoreDBPath.c_str());
+        g_pScoreDB->preloadScore();
 
         // song db
+        LOG_INFO << "[List] Initializing song.db...";
         Path dbPath = Path(GAMEDATA_PATH) / "database";
         if (!fs::exists(dbPath)) fs::create_directories(dbPath);
         g_pSongDB = std::make_shared<SongDB>(dbPath / "song.db");
@@ -43,6 +48,8 @@ ScenePreSelect::ScenePreSelect(): vScene(eMode::PRE_SELECT, 240)
 
         textHint = i18n::s(i18nText::INITIALIZING);
     }
+
+    LOG_INFO << "[List] ------------------------------------------------------------";
 }
 
 ScenePreSelect::~ScenePreSelect()
@@ -54,11 +61,11 @@ ScenePreSelect::~ScenePreSelect()
 
 void ScenePreSelect::_updateAsync()
 {
-    if (gNextScene != eScene::PRE_SELECT && gNextScene != eScene::SELECT) return;
+    if (gNextScene != SceneType::PRE_SELECT && gNextScene != SceneType::SELECT) return;
 
     if (gAppIsExiting)
     {
-        gNextScene = eScene::EXIT_TRANS;
+        gNextScene = SceneType::EXIT_TRANS;
         g_pSongDB->stopLoading();
     }
 
@@ -70,6 +77,7 @@ void ScenePreSelect::updateLoadSongs()
     if (!startedLoadSong)
     {
         startedLoadSong = true;
+        LOG_INFO << "[List] Start loading songs...";
 
         // wait for Initializing... text to draw
         pushAndWaitMainThreadTask<void>([] {});
@@ -93,32 +101,44 @@ void ScenePreSelect::updateLoadSongs()
                 pathList.push_back(Path(f));
             }
 
-            g_pSongDB->addFolders(pathList);
+            LOG_INFO << "[List] Refreshing folders...";
+            g_pSongDB->initializeFolders(pathList);
+            LOG_INFO << "[List] Refreshing folders complete.";
 
+            LOG_INFO << "[List] Building song list cache...";
+            g_pSongDB->prepareCache();
+            LOG_INFO << "[List] Building song list cache finished.";
+
+            LOG_INFO << "[List] Generating root folders...";
             auto top = g_pSongDB->browse(ROOT_FOLDER_HASH, false);
-            for (size_t i = 0; i < top.getContentsCount(); ++i)
+            if (top && !top->empty())
             {
-                auto entry = top.getEntry(i);
-
-                bool deleted = true;
-                for (auto& f : folderList)
+                for (size_t i = 0; i < top->getContentsCount(); ++i)
                 {
-                    if (fs::exists(f) && fs::exists(entry->getPath()) && fs::equivalent(f, entry->getPath()))
+                    auto entry = top->getEntry(i);
+
+                    bool deleted = true;
+                    for (auto& f : folderList)
                     {
-                        deleted = false;
-                        break;
+                        if (fs::exists(f) && fs::exists(entry->getPath()) && fs::equivalent(f, entry->getPath()))
+                        {
+                            deleted = false;
+                            break;
+                        }
+                    }
+                    if (!deleted)
+                    {
+                        g_pSongDB->browse(entry->md5, true);
+                        rootFolderProp.dbBrowseEntries.push_back({ entry, nullptr });
                     }
                 }
-                if (!deleted)
-                {
-                    g_pSongDB->browse(entry->md5, true);
-                    rootFolderProp.dbBrowseEntries.push_back({ entry, nullptr });
-                }
             }
+            LOG_INFO << "[List] Added " << rootFolderProp.dbBrowseEntries.size() << " root folders";
 
             g_pSongDB->optimize();
 
             // NEW SONG
+            LOG_INFO << "[List] Generating NEW SONG folder...";
             auto newSongList = g_pSongDB->findChartFromTime(ROOT_FOLDER_HASH,
                 std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() - State::get(IndexNumber::NEW_ENTRY_SECONDS));
             if (!newSongList.empty())
@@ -134,8 +154,10 @@ void ScenePreSelect::updateLoadSongs()
                 }
                 rootFolderProp.dbBrowseEntries.insert(rootFolderProp.dbBrowseEntries.begin(), {entry, nullptr});
             }
+            LOG_INFO << "[List] NEW SONG folder has " << newSongList.size() << " entries";
 
             // ARENA
+            LOG_INFO << "[List] Generating ARENA folder...";
             if (!rootFolderProp.dbBrowseEntries.empty())
             {
                 std::shared_ptr<EntryFolderArena> entry = std::make_shared<EntryFolderArena>(i18n::s(i18nText::ARENA_FOLDER_TITLE), i18n::s(i18nText::ARENA_FOLDER_SUBTITLE));
@@ -148,6 +170,7 @@ void ScenePreSelect::updateLoadSongs()
 
                 rootFolderProp.dbBrowseEntries.push_back({ entry, nullptr });
             }
+            LOG_INFO << "[List] ARENA has " << 0 << " known hosts (placeholder)";
 
             });
     }
@@ -169,6 +192,9 @@ void ScenePreSelect::updateLoadSongs()
     {
         g_pSongDB->waitLoadingFinish();
         loadSongEnd.get();
+        LOG_INFO << "[List] Loading songs complete.";
+        LOG_INFO << "[List] ------------------------------------------------------------";
+
         _updateCallback = std::bind(&ScenePreSelect::updateLoadTables, this);
     }
 }
@@ -178,12 +204,11 @@ void ScenePreSelect::updateLoadTables()
     if (!startedLoadTable)
     {
         startedLoadTable = true;
+        LOG_INFO << "[List] Start loading tables...";
 
         loadTableEnd = std::async(std::launch::async, [&]() {
 
             textHint = i18n::s(i18nText::CHECKING_TABLES);
-
-            g_pSongDB->preload();
 
             // initialize table list
             auto tableList = ConfigMgr::General()->getTablesUrl();
@@ -206,7 +231,7 @@ void ScenePreSelect::updateLoadTables()
                         std::shared_ptr<EntryFolderTable> tblLevel = std::make_shared<EntryFolderTable>(folderName, "");
                         for (const auto& r : t.getEntryList(lv))
                         {
-                            auto charts = g_pSongDB->findChartByHash(r->md5);
+                            auto charts = g_pSongDB->findChartByHash(r->md5, false);
                             bool added = false;
                             for (auto& c : charts)
                             {
@@ -241,16 +266,20 @@ void ScenePreSelect::updateLoadTables()
 
                 if (t.loadFromFile())
                 {
+                    // TODO should re-download the table if outdated
+                    LOG_INFO << "[List] Local table file found: " << t.getFolderPath().u8string();
                     rootFolderProp.dbBrowseEntries.push_back({ convertTable(t), nullptr });
                 }
                 else
                 {
+                    LOG_INFO << "[List] Local file not found. Downloading... " << t.getFolderPath().u8string();
                     textHint2 = i18n::s(i18nText::DOWNLOADING_TABLE);
 
                     t.updateFromUrl([&](DifficultyTable::UpdateResult result)
                         {
                             if (result == DifficultyTable::UpdateResult::OK)
                             {
+                                LOG_INFO << "[List] Table file download complete: " << t.getFolderPath().u8string();
                                 rootFolderProp.dbBrowseEntries.push_back({ convertTable(t), nullptr });
                             }
                             else
@@ -275,12 +304,16 @@ void ScenePreSelect::updateLoadTables()
                         });
                 }
             }
+
             });
     }
 
     if (loadTableEnd.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
     {
         loadTableEnd.get();
+        LOG_INFO << "[List] Loading tables complete.";
+        LOG_INFO << "[List] ------------------------------------------------------------";
+
         _updateCallback = std::bind(&ScenePreSelect::updateLoadCourses, this);
     }
 }
@@ -290,6 +323,7 @@ void ScenePreSelect::updateLoadCourses()
     if (!startedLoadCourse)
     {
         startedLoadCourse = true;
+        LOG_INFO << "[List] Start loading courses...";
 
         loadCourseEnd = std::async(std::launch::async, [&]() {
 
@@ -301,13 +335,15 @@ void ScenePreSelect::updateLoadCourses()
             Path coursePath = Path(GAMEDATA_PATH) / "courses";
             if (!fs::exists(coursePath))
                 fs::create_directories(coursePath);
+
+            LOG_INFO << "[List] Loading courses from courses/*.lr2crs...";
             for (auto& courseFile : fs::recursive_directory_iterator(coursePath))
             {
                 if (!(fs::is_regular_file(courseFile) && strEqual(courseFile.path().extension().u8string(), ".lr2crs", true)))
                     continue;
 
                 Path coursePath = courseFile.path();
-                LOG_INFO << "[List] Add course file: " << coursePath.u8string();
+                LOG_INFO << "[List] Loading course file: " << coursePath.u8string();
                 textHint2 = coursePath.u8string();
 
                 CourseLr2crs lr2crs(coursePath);
@@ -318,6 +354,9 @@ void ScenePreSelect::updateLoadCourses()
                         courses[entry->courseType].push_back(entry);
                 }
             }
+            LOG_INFO << "[List] *.lr2crs loading complete.";
+
+            // TODO load courses from tables
 
             for (auto& [type, courses] : courses)
             {
@@ -336,6 +375,7 @@ void ScenePreSelect::updateLoadCourses()
                 auto folder = std::make_shared<EntryFolderCourse>(folderTitle, folderTitle2);
                 for (auto& c : courses)
                 {
+                    LOG_INFO << "[List] Add course: " << c->_name;
                     folder->pushEntry(c);
                 }
                 rootFolderProp.dbBrowseEntries.push_back({ folder, nullptr });
@@ -347,6 +387,9 @@ void ScenePreSelect::updateLoadCourses()
     if (loadCourseEnd.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
     {
         loadCourseEnd.get();
+        LOG_INFO << "[List] Loading courses complete.";
+        LOG_INFO << "[List] ------------------------------------------------------------";
+
         _updateCallback = std::bind(&ScenePreSelect::loadFinished, this);
     }
 }
@@ -364,7 +407,7 @@ void ScenePreSelect::loadFinished()
             State::set(IndexText::PLAY_TITLE, i18n::s(i18nText::BMS_NOT_FOUND));
             State::set(IndexText::PLAY_ARTIST, i18n::s(i18nText::BMS_NOT_FOUND_HINT));
         }
-        if (gNextScene == eScene::PRE_SELECT)
+        if (gNextScene == SceneType::PRE_SELECT)
         {
             textHint = (boost::format("%s %s %s (%s %s)")
                 % PROJECT_NAME % PROJECT_VERSION
@@ -389,13 +432,13 @@ void ScenePreSelect::loadFinished()
             maxFPS = 30;
         graphics_set_maxfps(maxFPS);
 
-        gNextScene = eScene::SELECT;
+        gNextScene = SceneType::SELECT;
         loadingFinished = true;
     }
 }
 
 
-void ScenePreSelect::_updateImgui()
+void ScenePreSelect::updateImgui()
 {
     if (gInCustomize) return;
 

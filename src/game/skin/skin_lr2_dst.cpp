@@ -311,7 +311,7 @@ void updateDstOpt()
 	// //選曲リスト用
 	// 100 NOT PLAYED
 	// 101 FAILED
-	// 102 EASY / ASSISTED EASY CLEARED
+	// 102 EASY / ASSISTED CLEARED
 	// 103 NORMAL CLEARED
 	// 104 HARD / EXHARD CLEARED
 	// 105 FULL COMBO / PERFECT / MAX
@@ -321,7 +321,7 @@ void updateDstOpt()
 	// 106 EXHARD CLEARED
 	// 107 PERFECT
 	// 108 MAX
-	// 109 ASSISTED EASY
+	// 109 ASSISTED
 	{
         using namespace Option;
         switch (State::get(IndexOption::SELECT_ENTRY_LAMP))
@@ -676,6 +676,21 @@ void updateDstOpt()
 	// 271 2P SUD+変更中
 	set(270, sw(IndexSwitch::P1_SETTING_LANECOVER));
 	set(271, sw(IndexSwitch::P2_SETTING_LANECOVER));
+
+	// 272 1P Hi-Speed変更中
+	// 273 2P Hi-Speed変更中
+	set(272, sw(IndexSwitch::P1_SETTING_HISPEED));
+	set(273, sw(IndexSwitch::P2_SETTING_HISPEED));
+
+	// 274 1P SUD+
+	// 275 2P SUD+
+	set(274, sw(IndexSwitch::P1_HAS_LANECOVER_TOP));
+	set(275, sw(IndexSwitch::P2_HAS_LANECOVER_TOP));
+
+	// 276 1P HID+/LIFT
+	// 277 2P HID+/LIFT
+	set(276, sw(IndexSwitch::P1_HAS_LANECOVER_BOTTOM));
+	set(277, sw(IndexSwitch::P2_HAS_LANECOVER_BOTTOM));
 
 	// 280 コースステージ1
 	// 281 コースステージ2
@@ -1121,7 +1136,7 @@ void updateDstOpt()
 	// 810: Lanecover Enabled 2P
 	// 811: FHS 2P
 	set(800, State::get(IndexSwitch::P1_LANECOVER_ENABLED));
-	set(810, State::get(IndexSwitch::P1_LOCK_SPEED));
+	set(801, State::get(IndexSwitch::P1_LOCK_SPEED));
 	set(810, State::get(IndexSwitch::P2_LANECOVER_ENABLED));
 	set(811, State::get(IndexSwitch::P2_LOCK_SPEED));
 

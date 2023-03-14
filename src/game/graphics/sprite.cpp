@@ -39,7 +39,7 @@ bool checkPanel(int panelIdx)
     }
 }
 
-RenderParams& RenderParams::operator=(const KeyFrameParams& rhs)
+RenderParams& RenderParams::operator=(const MotionKeyFrameParams& rhs)
 {
     rect.x = (float)rhs.rect.x;
     rect.y = (float)rhs.rect.y;
@@ -58,39 +58,39 @@ RenderParams& RenderParams::operator=(const KeyFrameParams& rhs)
 
 ////////////////////////////////////////////////////////////////////////////////
 // virtual base class functions
-vSprite::vSprite(pTexture tex, SpriteTypes type) :
-    _pTexture(tex), _type(type), _current({ 0, RenderParams::CONSTANT, 0x00000000, BlendMode::NONE, false, 0 }) {}
+SpriteBase::SpriteBase(const SpriteBuilder& builder) :
+    srcLine(builder.srcLine), pTexture(builder.texture), _type(SpriteTypes::VIRTUAL), _current({0, MotionKeyFrameParams::CONSTANT, 0x00000000, BlendMode::NONE, false, 0}) {}
 
-bool vSprite::updateByKeyframes(const Time& rawTime)
+bool SpriteBase::updateMotion(const Time& rawTime)
 {
     // Check if object is valid
 	// Note that nullptr texture shall pass
-    if (_pTexture != nullptr && !_pTexture->_loaded)
+    if (pTexture != nullptr && !pTexture->loaded)
         return false;
 
     // Check if frames are valid
-    size_t frameCount = _keyFrames.size();
+    size_t frameCount = motionKeyFrames.size();
     if (frameCount < 1)
         return false;
 
 	Time time;
 
     // Check if timer is valid
-    if (State::get(_triggerTimer) < 0 || State::get(_triggerTimer) == TIMER_NEVER)
+    if (State::get(motionStartTimer) < 0 || State::get(motionStartTimer) == TIMER_NEVER)
         return false;
 
 	// Check if timer is 140
-    if (_triggerTimer == IndexTimer::MUSIC_BEAT)
+    if (motionStartTimer == IndexTimer::MUSIC_BEAT)
     {
         time = State::get(IndexTimer::MUSIC_BEAT);
     }
     else
     {
-        time = rawTime - Time(State::get(_triggerTimer), false);
+        time = rawTime - Time(State::get(motionStartTimer), false);
     }
 
     // Check if the sprite is not visible yet
-    if (!_drawn && _keyFrames[0].time > 0 && time.norm() < _keyFrames[0].time)
+    if (!drawn && motionKeyFrames[0].time > 0 && time.norm() < motionKeyFrames[0].time)
         return false;
 
     // Check if import time is valid
@@ -98,38 +98,38 @@ bool vSprite::updateByKeyframes(const Time& rawTime)
         return false;
 
     // Check if loop target is valid
-    Time endTime = Time(_keyFrames[frameCount - 1].time, false);
-    if (_loopTo < 0 && time > endTime)
+    Time endTime = Time(motionKeyFrames[frameCount - 1].time, false);
+    if (motionLoopTo < 0 && time > endTime)
         return false;
-    if (_loopTo > _keyFrames[frameCount - 1].time)
-        time = _keyFrames[frameCount - 1].time;
+    if (motionLoopTo > motionKeyFrames[frameCount - 1].time)
+        time = motionKeyFrames[frameCount - 1].time;
 
 
     // crop time into valid section
     if (time > endTime)
     {
-		if (endTime != _loopTo)
-			time = Time((time - _loopTo).norm() % (endTime - _loopTo).norm() + _loopTo, false);
+		if (endTime != motionLoopTo)
+			time = Time((time - motionLoopTo).norm() % (endTime - motionLoopTo).norm() + motionLoopTo, false);
         else
-            time = _loopTo;
+            time = motionLoopTo;
     }
 
     // Check if specific time
-    if (time == _keyFrames[frameCount - 1].time)
+    if (time == motionKeyFrames[frameCount - 1].time)
     {
         // exactly last frame
-        _current = _keyFrames[frameCount - 1].param;
+        _current = motionKeyFrames[frameCount - 1].param;
     }
-    else if (frameCount == 1 || time.norm() <= _keyFrames[0].time)
+    else if (frameCount == 1 || time.norm() <= motionKeyFrames[0].time)
     {
         // exactly first frame
-        _current = _keyFrames[0].param;
+        _current = motionKeyFrames[0].param;
     }
     else
     {
         // get keyFrame section (iterators)
-        decltype(_keyFrames.begin()) keyFrameCurr, keyFrameNext;
-        for (auto it = _keyFrames.begin(); it != _keyFrames.end(); ++it)
+        decltype(motionKeyFrames.begin()) keyFrameCurr, keyFrameNext;
+        for (auto it = motionKeyFrames.begin(); it != motionKeyFrames.end(); ++it)
         {
             if (it->time <= time.norm()) 
                 keyFrameCurr = it;
@@ -137,7 +137,7 @@ bool vSprite::updateByKeyframes(const Time& rawTime)
                 break;
         }
         keyFrameNext = keyFrameCurr;
-        if (keyFrameCurr + 1 != _keyFrames.end()) ++keyFrameNext;
+        if (keyFrameCurr + 1 != motionKeyFrames.end()) ++keyFrameNext;
 
         // Check if section period is 0
         auto keyFrameLength = keyFrameNext->time - keyFrameCurr->time;
@@ -151,17 +151,17 @@ bool vSprite::updateByKeyframes(const Time& rawTime)
             double prog = 1.0 * (time.norm() - keyFrameCurr->time) / keyFrameLength;
             switch (keyFrameCurr->param.accel)
             {
-            case RenderParams::CONSTANT:
+            case MotionKeyFrameParams::CONSTANT:
                 break;
-            case RenderParams::ACCEL:
+            case MotionKeyFrameParams::ACCEL:
                 //prog = -std::cos(prog * 1.57079632679) + 1.0;
                 prog = prog * prog * prog;
                 break;
-            case RenderParams::DECEL:
+            case MotionKeyFrameParams::DECEL:
                 //prog = std::sin(prog * 1.57079632679);
                 prog = 1.0 - ((1.0 - prog) * (1.0 - prog) * (1.0 - prog));
                 break;
-            case RenderParams::DISCONTINOUS:
+            case MotionKeyFrameParams::DISCONTINOUS:
                 prog = 0.0;
             }
 
@@ -170,7 +170,7 @@ bool vSprite::updateByKeyframes(const Time& rawTime)
             _current.rect.y = (float)grad(keyFrameNext->param.rect.y, keyFrameCurr->param.rect.y, prog);
             _current.rect.w = (float)grad(keyFrameNext->param.rect.w, keyFrameCurr->param.rect.w, prog);
             _current.rect.h = (float)grad(keyFrameNext->param.rect.h, keyFrameCurr->param.rect.h, prog);
-            //_current.rect  = keyFrameNext->param.rect  * prog + keyFrameCurr->param.rect  * (1.0 - prog);
+            //_current.rcGrid  = keyFrameNext->param.rcGrid  * prog + keyFrameCurr->param.rcGrid  * (1.0 - prog);
             _current.color.r = (Uint8)grad(keyFrameNext->param.color.r, keyFrameCurr->param.color.r, prog);
             _current.color.g = (Uint8)grad(keyFrameNext->param.color.g, keyFrameCurr->param.color.g, prog);
             _current.color.b = (Uint8)grad(keyFrameNext->param.color.b, keyFrameCurr->param.color.b, prog);
@@ -179,9 +179,9 @@ bool vSprite::updateByKeyframes(const Time& rawTime)
             _current.angle = grad(static_cast<int>(std::round(keyFrameNext->param.angle)), static_cast<int>(std::round(keyFrameCurr->param.angle)), prog);
             _current.center = keyFrameCurr->param.center;
             //LOG_DEBUG << "[Skin] Time: " << time << 
-            //    " @ " << _current.rect.x << "," << _current.rect.y << " " << _current.rect.w << "x" << _current.rect.h;
-            //LOG_DEBUG<<"[Skin] keyFrameCurr: " << keyFrameCurr->param.rect.x << "," << keyFrameCurr->param.rect.y << " " << keyFrameCurr->param.rect.w << "x" << keyFrameCurr->param.rect.h;
-            //LOG_DEBUG<<"[Skin] keyFrameNext: " << keyFrameNext->param.rect.x << "," << keyFrameNext->param.rect.y << " " << keyFrameNext->param.rect.w << "x" << keyFrameNext->param.rect.h;
+            //    " @ " << _current.rcGrid.x << "," << _current.rcGrid.y << " " << _current.rcGrid.w << "x" << _current.rcGrid.h;
+            //LOG_DEBUG<<"[Skin] keyFrameCurr: " << keyFrameCurr->param.rcGrid.x << "," << keyFrameCurr->param.rcGrid.y << " " << keyFrameCurr->param.rcGrid.w << "x" << keyFrameCurr->param.rcGrid.h;
+            //LOG_DEBUG<<"[Skin] keyFrameNext: " << keyFrameNext->param.rcGrid.x << "," << keyFrameNext->param.rcGrid.y << " " << keyFrameNext->param.rcGrid.w << "x" << keyFrameNext->param.rcGrid.h;
             _current.blend = keyFrameCurr->param.blend;
             _current.filter = keyFrameCurr->param.filter;
         }
@@ -190,40 +190,30 @@ bool vSprite::updateByKeyframes(const Time& rawTime)
     return true;
 }
 
-bool vSprite::update(const Time& t)
+bool SpriteBase::update(const Time& t)
 {
-    _draw = updateByKeyframes(t);
+    _draw = updateMotion(t);
 
-    if (_draw) _drawn = true;
+    if (_draw) drawn = true;
     return _draw;
 }
 
-RenderParams vSprite::getCurrentRenderParams()
+void SpriteBase::setMotionStartTimer(IndexTimer t)
 {
-    return _current;
+	motionStartTimer = t;
 }
 
-RenderParams& vSprite::getCurrentRenderParamsRef()
+void SpriteBase::appendMotionKeyFrame(const MotionKeyFrame& f)
 {
-    return _current;
+    motionKeyFrames.push_back(f);
 }
 
-void vSprite::setLoopTime(int t)
+void SpriteBase::setMotionLoopTo(int time)
 {
-    _loopTo = t;
+    motionLoopTo = time;
 }
 
-void vSprite::setTrigTimer(IndexTimer t)
-{
-	_triggerTimer = t;
-}
-
-void vSprite::appendKeyFrame(const RenderKeyFrame& f)
-{
-    _keyFrames.push_back(f);
-}
-
-void vSprite::adjustAfterUpdate(int x, int y, int w, int h)
+void SpriteBase::adjustAfterUpdate(int x, int y, int w, int h)
 {
     _current.rect.x += x - w;
     _current.rect.y += y - h;
@@ -235,68 +225,81 @@ void vSprite::adjustAfterUpdate(int x, int y, int w, int h)
 ////////////////////////////////////////////////////////////////////////////////
 // Static
 
-SpriteStatic::SpriteStatic(pTexture texture) :
-	SpriteStatic(texture, texture ? texture->getRect(): Rect()) {}
-SpriteStatic::SpriteStatic(pTexture texture, const Rect& rect):
-    vSprite(texture, SpriteTypes::STATIC), _texRect(rect) {}
+SpriteStatic::SpriteStatic(const SpriteStaticBuilder& builder): SpriteBase(builder)
+{
+    _type = SpriteTypes::STATIC;
+
+    if (pTexture && builder.textureRect == RECT_FULL)
+        textureRect = pTexture->getRect();
+    else
+        textureRect = builder.textureRect;
+}
+
+SpriteStatic::SpriteStatic(std::shared_ptr<Texture> texture, const Rect& texRect, int srcLine) : SpriteBase(SpriteTypes::STATIC, srcLine)
+{
+    pTexture = texture;
+    if (pTexture && texRect == RECT_FULL)
+        textureRect = pTexture->getRect();
+    else
+        textureRect = texRect;
+}
 
 void SpriteStatic::draw() const
 {
     if (isHidden()) return;
 
-    if (_draw && _pTexture->_loaded)
-        _pTexture->draw(_texRect, _current.rect, _current.color, _current.blend, _current.filter, _current.angle, _current.center);
+    if (_draw && pTexture->loaded)
+        pTexture->draw(textureRect, _current.rect, _current.color, _current.blend, _current.filter, _current.angle, _current.center);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Split
 
-SpriteSelection::SpriteSelection(pTexture texture, unsigned rows, unsigned cols, bool v): 
-    SpriteSelection(texture, texture ? texture->getRect() : Rect(), rows, cols, v)
+SpriteSelection::SpriteSelection(const SpriteSelectionBuilder& builder) : SpriteBase(builder)
 {
-}
+    _type = SpriteTypes::SPLIT;
+    textureSheetRows = builder.textureSheetRows;
+    textureSheetCols = builder.textureSheetCols;
 
-SpriteSelection::SpriteSelection(pTexture texture, const Rect& r, unsigned rows, unsigned cols, bool v):
-    vSprite(texture, SpriteTypes::SPLIT)
-{
-    if (rows == 0 || cols == 0)
+    if (textureSheetRows == 0 || textureSheetCols == 0)
     {
-        _srows = _scols = 0;
-        _texRect.resize(0);
+        textureRects.resize(0);
         return;
     }
 
-    _srows = rows;
-    _scols = cols;
-    _segments = rows * cols;
-    auto rect = r;
-    rect.w /= cols;
-    rect.h /= rows;
-    if (!v)
+    Rect rcGrid;
+    if (pTexture && builder.textureRect == RECT_FULL)
+        rcGrid = pTexture->getRect();
+    else
+        rcGrid = builder.textureRect;
+    rcGrid.w /= textureSheetCols;
+    rcGrid.h /= textureSheetRows;
+
+    if (!builder.textureSheetVerticalIndexing)
     {
         // Horizontal first
-        for (unsigned r = 0; r < rows; ++r)
-            for (unsigned c = 0; c < cols; ++c)
+        for (unsigned r = 0; r < textureSheetRows; ++r)
+            for (unsigned c = 0; c < textureSheetCols; ++c)
             {
-                _texRect.emplace_back(
-                    rect.x + rect.w * c,
-                    rect.y + rect.h * r,
-                    rect.w,
-                    rect.h
+                textureRects.emplace_back(
+                    rcGrid.x + rcGrid.w * c,
+                    rcGrid.y + rcGrid.h * r,
+                    rcGrid.w,
+                    rcGrid.h
                 );
             }
     }
     else
     {
         // Vertical first
-        for (unsigned c = 0; c < cols; ++c)
-            for (unsigned r = 0; r < rows; ++r)
+        for (unsigned c = 0; c < textureSheetCols; ++c)
+            for (unsigned r = 0; r < textureSheetRows; ++r)
             {
-                _texRect.emplace_back(
-                    rect.x + rect.w * c,
-                    rect.y + rect.h * r,
-                    rect.w,
-                    rect.h
+                textureRects.emplace_back(
+                    rcGrid.x + rcGrid.w * c,
+                    rcGrid.y + rcGrid.h * r,
+                    rcGrid.w,
+                    rcGrid.h
                 );
             }
     }
@@ -306,169 +309,136 @@ void SpriteSelection::draw() const
 {
     if (isHidden()) return;
 
-    if (_draw && _pTexture->_loaded)
-        _pTexture->draw(_texRect[_selectionIdx], _current.rect, _current.color, _current.blend, _current.filter, _current.angle, _current.center);
+    if (_draw && pTexture->loaded)
+        pTexture->draw(textureRects[selectionIndex], _current.rect, _current.color, _current.blend, _current.filter, _current.angle, _current.center);
 }
 
-void SpriteSelection::updateSelection(frameIdx frame)
+void SpriteSelection::updateSelection(size_t frame)
 {
-    _selectionIdx = frame < _segments ? frame : _segments - 1;
+    selectionIndex = frame < textureRects.size() ? frame : textureRects.size() - 1;
 }
 
 bool SpriteSelection::update(const Time& t)
 {
-    if (_texRect.size() < _segments) return false;
-
-	return vSprite::update(t);
+	return SpriteBase::update(t);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Animated
 
-SpriteAnimated::SpriteAnimated(pTexture texture, 
-    unsigned animFrames, unsigned frameTime, IndexTimer t, 
-    unsigned selRows, unsigned selCols, bool selVert):
-    SpriteAnimated(texture, texture ? texture->getRect() : Rect(), animFrames, frameTime, t,
-		selRows, selCols, selVert)
-{
-}
-
-SpriteAnimated::SpriteAnimated(pTexture texture, const Rect& r, 
-    unsigned animFrames, unsigned frameTime, IndexTimer t, 
-    unsigned selRows, unsigned selCols, bool selVert):
-    SpriteSelection(texture, r, selRows, selCols, selVert), _animFrames(animFrames), _resetAnimTimer(t)
+SpriteAnimated::SpriteAnimated(const SpriteAnimatedBuilder& builder) : SpriteSelection(builder)
 {
     _type = SpriteTypes::ANIMATED;
+    animationFrames = builder.animationFrameCount;
+    animationStartTimer = builder.animationTimer;
 
-    if (animFrames == 0 || selRows == 0 || selCols == 0) return;
+    if (textureRects.empty() || animationFrames == 0)
+        return;
 
-	if (_animFrames != 0) _selections = selRows * selCols / _animFrames;
-	//_aframes = animFrames;
-    //_aRect.w = _texRect[0].w / animCols;
-    //_aRect.h = _texRect[0].h / animRows;
-    //_arows = animRows;
-    //_acols = animCols;
-    //_aframes = animRows * animCols;
-    _period = frameTime;
-    //_aVert = animVert;
+    selections = textureSheetRows * textureSheetCols / animationFrames;
+    animationDurationPerLoop = builder.animationDurationPerLoop;
 }
 
 bool SpriteAnimated::update(const Time& t)
 {
 	if (SpriteSelection::update(t))
 	{
-		updateByTimer(t);
-		//updateSplitByTimer(t);
-		updateAnimationByTimer(t);
+        long long timerAnim = State::get(animationStartTimer);
+        if (timerAnim > 0 && timerAnim != TIMER_NEVER)
+            updateAnimation(t - Time(timerAnim));
+
 		return true;
 	}
 	return false;
 }
 
-void SpriteAnimated::updateByTimer(const Time& time)
-{
-	if (State::get(_triggerTimer))
-		updateByKeyframes(time);
-}
-
 void SpriteAnimated::updateAnimation(const Time& time)
 {
-    if (_segments == 0) return;
-    if (_period == -1) return;
+    if (textureRects.empty()) return;
+    if (animationDurationPerLoop == -1) return;
 
-    if (double timeEachFrame = double(_period) / _animFrames; timeEachFrame >= 1.0)
+    if (double timeEachFrame = double(animationDurationPerLoop) / animationFrames; timeEachFrame >= 1.0)
     {
-        auto animFrameTime = (time.norm() >= 0) ? (time.norm() % _period) : 0;
-        _currAnimFrame = static_cast<frameIdx>(std::floor(animFrameTime / timeEachFrame));
+        auto animFrameTime = (time.norm() >= 0) ? (time.norm() % animationDurationPerLoop) : 0;
+        animationFrameIndex = static_cast<size_t>(std::floor(animFrameTime / timeEachFrame));
     }
-	/*
-    _drawRect = _texRect[_selectionIdx];
-    _drawRect.w = _aRect.w;
-    _drawRect.h = _aRect.h;
-    if (!_aVert)
-    {
-        // Horizontal first
-        _drawRect.x += _aRect.w * (f % _acols);
-        _drawRect.y += _aRect.h * (f / _acols);
-    }
-    else
-    {
-        // Vertical first
-        _drawRect.x += _aRect.w * (f / _arows);
-        _drawRect.y += _aRect.h * (f % _arows);
-    }
-	*/
 }
 
-void SpriteAnimated::updateAnimationByTimer(const Time& time)
-{
-	if (State::get(_resetAnimTimer))
-		updateAnimation(time - Time(State::get(_resetAnimTimer)));
-}
-
-// Commented for backup purpose. I don't think I can understand this...
-// Animation should not affect Split rect, which is decided by user.
-/*
-void SpriteAnimated::updateSplitByTimer(rTime time)
-{
-    // total frame:    _aframes
-    // time one cycle: _period
-    // time per frame: _period / _aframes
-    // current time:   t
-    // current frame:  t / (_period / _aframes)
-    if (_period / _aframes > 0 && State::get(_triggerTimer))
-        updateSplit((frameIdx)((time - State::get(_triggerTimer)) / (_period / _aframes)));
-}
-*/
 void SpriteAnimated::draw() const
 {
     if (isHidden()) return;
 
-    if (_draw && _currAnimFrame < _texRect.size() && _pTexture != nullptr && _pTexture->_loaded)
+    if (_draw && animationFrameIndex < textureRects.size() && pTexture != nullptr && pTexture->loaded)
     {
-        _pTexture->draw(_texRect[_selectionIdx * _animFrames + _currAnimFrame], _current.rect, _current.color, _current.blend, _current.filter, _current.angle, _current.center);
+        pTexture->draw(textureRects[selectionIndex * animationFrames + animationFrameIndex], _current.rect, _current.color, _current.blend, _current.filter, _current.angle, _current.center);
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Text
 
-SpriteText::SpriteText(pFont f, IndexText e, TextAlign a, unsigned ptsize, Color c):
-   SpriteStatic(nullptr), _pFont(f), _textInd(e), _align(a), _height(ptsize * 3 / 2), _color(c)
+SpriteText::SpriteText(const SpriteTextBuilder& builder) : SpriteBase(builder)
 {
     _type = SpriteTypes::TEXT;
+    pFont = builder.font;
+    textInd = builder.textInd;
+    align = builder.align;
+    textHeight = builder.ptsize * 3 / 2;
+    textColor = builder.color;
+    editable = builder.editable;
 }
-
-/*
-SpriteText::SpriteText(pFont f, Rect rect, IndexText e, TextAlign a, unsigned ptsize, Color c):
-   SpriteStatic(nullptr), _pFont(f), _frameRect(rect), _textInd(e), _align(a), _color(c)
-{
-    _opType = SpriteTypes::TEXT;
-    _haveRect = true;
-	_texRect = rect;
-}
-*/
 
 bool SpriteText::update(const Time& t)
 {   
-    return _draw = updateByKeyframes(t);
+    return _draw = updateMotion(t);
 }
 
 void SpriteText::updateText()
 {
     if (!_draw) return;
 
-    setInputBindingText(State::get(_textInd), _current.color);
+    updateTextTexture(State::get(textInd), _current.color);
     updateTextRect();
 
 }
+
+void SpriteText::updateTextTexture(std::string&& text, const Color& c)
+{
+    if (!pFont || !pFont->loaded)
+        return;
+
+    if (pTexture != nullptr && this->text == text && textColor == c)
+        return;
+
+    if (text.empty() || c.a == 0)
+    {
+        pTexture = nullptr;
+        _draw = false;
+        return;
+    }
+
+    this->text = text;
+    textColor = c;
+
+    pTexture = pFont->TextUTF8(text.c_str(), c);
+    if (pTexture)
+    {
+        textureRect = pTexture->getRect();
+        _draw = true;
+    }
+    else
+    {
+        _draw = false;
+    }
+}
+
 void SpriteText::updateTextRect()
 {
 	// fitting
-	Rect textRect = _texRect;
+	Rect textRect = textureRect;
 	double sizeFactor = (double)_current.rect.h / textRect.h;
 	int text_w = static_cast<int>(std::round(textRect.w * sizeFactor));
-	switch (_align)
+	switch (align)
 	{
 	case TEXT_ALIGN_LEFT:
 		break;
@@ -480,60 +450,11 @@ void SpriteText::updateTextRect()
 		break;
 	}
 	_current.rect.w = text_w;
-
-    /*
-    if (_haveParent && !_parent.expired())
-    {
-        auto parent = _parent.lock();
-        auto r = parent->getCurrentRenderParams().rect;
-        if (r.w == -1 && r.h == -1)
-        {
-            _current.rect.x = 0;
-            _current.rect.y = 0;
-        }
-        else
-        {
-            _current.rect.x += parent->getCurrentRenderParams().rect.x;
-            _current.rect.y += parent->getCurrentRenderParams().rect.y;
-        }
-    }
-    */
-
-}
-
-void SpriteText::setInputBindingText(std::string&& text, const Color& c)
-{
-    if (!_pFont || !_pFont->_loaded)
-        return;
-
-    if (_pTexture != nullptr && _currText == text && _color == c)
-        return;
-
-    if (text.empty() || c.a == 0)
-    {
-        _pTexture = nullptr;
-        _draw = false;
-        return;
-    }
-
-    _currText = text;
-    _color = c;
-
-    _pTexture = _pFont->TextUTF8(_currText.c_str(), c);
-    if (_pTexture)
-    {
-        _texRect = _pTexture->getRect();
-        _draw = true;
-    }
-    else
-    {
-        _draw = false;
-    }
 }
 
 bool SpriteText::OnClick(int x, int y)
 {
-    if (!_editable) return false;
+    if (!editable) return false;
     if (_current.rect.x <= x && x < _current.rect.x + _current.rect.w &&
         _current.rect.y <= y && y < _current.rect.y + _current.rect.h)
     {
@@ -545,30 +466,30 @@ bool SpriteText::OnClick(int x, int y)
 void SpriteText::startEditing(bool clear)
 {
     using namespace std::placeholders;
-    if (!_editing)
+    if (!isEditing())
     {
-        _editing = true;
-        _textBeforeEdit = State::get(_textInd);
-        _textAfterEdit = (clear ? "" : _currText);
-        startTextInput(_current.rect, _textAfterEdit, std::bind(&SpriteText::EditUpdateText, this, _1));
+        editing = true;
+        textBeforeEdit = State::get(textInd);
+        textAfterEdit = (clear ? "" : text);
+        startTextInput(_current.rect, textAfterEdit, std::bind(&SpriteText::updateTextWhileEditing, this, _1));
     }
 }
 
 void SpriteText::stopEditing(bool modify)
 {
-    if (_editing)
+    if (isEditing())
     {
         stopTextInput();
-        _editing = false;
-        State::set(_textInd, (modify ? _textAfterEdit : _textBeforeEdit));
+        editing = false;
+        State::set(textInd, (modify ? textAfterEdit : textBeforeEdit));
         updateText();
     }
 }
 
-void SpriteText::EditUpdateText(const std::string& text)
+void SpriteText::updateTextWhileEditing(const std::string& text)
 {
-    _textAfterEdit = text;
-    State::set(_textInd, text + "|");
+    textAfterEdit = text;
+    State::set(textInd, text + "|");
     updateText();
 }
 
@@ -576,52 +497,45 @@ void SpriteText::draw() const
 {
     if (isHidden()) return;
 
-    if (_draw && _pTexture)
+    if (_draw && pTexture && pTexture->loaded)
     {
-        SpriteStatic::draw();
+        pTexture->draw(textureRect, _current.rect, _current.color, _current.blend, _current.filter, _current.angle, _current.center);
     }
 }
 
 void SpriteText::setOutline(int width, const Color& c)
 {
-    pushMainThreadTask([&] { _pFont->setOutline(width, c); });
+    pushMainThreadTask([&] { pFont->setOutline(width, c); });
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Number
 
-SpriteNumber::SpriteNumber(pTexture texture, NumberAlign align, unsigned maxDigits,
-    unsigned numRows, unsigned numCols, unsigned frameTime, IndexNumber n, IndexTimer t,
-    unsigned animFrames, bool numVert):
-    SpriteNumber(texture, texture ? texture->getRect() : Rect(), align, maxDigits,
-		numRows, numCols, frameTime, n, t,
-		animFrames, numVert)
-{
-}
-
-SpriteNumber::SpriteNumber(pTexture texture, const Rect& rect, NumberAlign align, unsigned maxDigits,
-    unsigned numRows, unsigned numCols, unsigned frameTime, IndexNumber n, IndexTimer t,
-    unsigned animFrames, bool numVert):
-    SpriteAnimated(texture, rect, animFrames, frameTime, t, numRows, numCols, numVert),
-    _alignType(align), _numInd(n), _maxDigits(maxDigits)
+SpriteNumber::SpriteNumber(const SpriteNumberBuilder& builder): SpriteAnimated(builder)
 {
     _type = SpriteTypes::NUMBER;
+    alignType = builder.align;
+    numInd = builder.numInd;
+    maxDigits = builder.maxDigits;
+    hideLeadingZeros = builder.hideLeadingZeros;
 
     // invalid num type guard
-    //_numType = NumberType(numRows * numCols);
-    if (animFrames != 0)
-        _numType = NumberType(numRows * numCols / animFrames);
+    //numberType = NumberType(numRows * numCols);
+    if (animationFrames != 0)
+        numberType = NumberType(textureSheetRows * textureSheetCols / animationFrames);
     else
-        _numType = NumberType(0);
+        numberType = NumberType(0);
 
-    _digit.resize(maxDigits);
-    _rects.resize(maxDigits);
+    digitNumber.resize(maxDigits);
+    digitOutRect.resize(maxDigits);
 
-    switch (_numType)
+    switch (numberType)
     {
     case NUM_TYPE_NORMAL:
     case NUM_TYPE_BLANKZERO:
         break;
-    //case NUM_SYMBOL:
-    case NUM_TYPE_FULL: 
+        //case NUM_SYMBOL:
+    case NUM_TYPE_FULL:
         break;
     default: return;
     }
@@ -629,8 +543,8 @@ SpriteNumber::SpriteNumber(pTexture texture, const Rect& rect, NumberAlign align
 
 bool SpriteNumber::update(const Time& t)
 {
-    if (_maxDigits == 0) return false;
-    if (_numType == 0) return false;
+    if (maxDigits == 0) return false;
+    if (numberType == 0) return false;
 
 	if (SpriteAnimated::update(t))
 	{
@@ -647,46 +561,46 @@ void SpriteNumber::updateNumber(int n)
 
     bool positive = n >= 0;
 	int zeroIdx = -1;
-    unsigned maxDigits = static_cast<unsigned>(_digit.size());
-	switch (_numType)
+    unsigned digits = static_cast<unsigned>(digitNumber.size());
+	switch (numberType)
 	{
 	case NUM_TYPE_NORMAL:    zeroIdx = -1; break;
 	case NUM_TYPE_BLANKZERO: zeroIdx = NUM_BZERO; break;
-    case NUM_TYPE_FULL:      zeroIdx = positive ? NUM_FULL_BZERO_POS : NUM_FULL_BZERO_NEG; maxDigits--; break;
+    case NUM_TYPE_FULL:      zeroIdx = positive ? NUM_FULL_BZERO_POS : NUM_FULL_BZERO_NEG; digits--; break;
 	}
 
     // reset by zeroIdx to prevent unexpected glitches
-    for (auto& d : _digit) d = zeroIdx;
+    for (auto& d : digitNumber) d = zeroIdx;
 
 	if (n == 0)
 	{
-        _digit[0] = 0;
-		_numDigits = 1;
+        digitNumber[0] = 0;
+		digitCount = 1;
 	}
 	else
 	{
-		_numDigits = 0;
+		digitCount = 0;
 		int abs_n = std::abs(n);
-		for (unsigned i = 0; abs_n && i < maxDigits; ++i)
+		for (unsigned i = 0; abs_n && i < digits; ++i)
 		{
-			++_numDigits;
+			++digitCount;
 			unsigned digit = abs_n % 10;
 			abs_n /= 10;
-            if (_numType == NUM_TYPE_FULL && !positive) digit += 12;
-			_digit[i] = digit;
+            if (numberType == NUM_TYPE_FULL && !positive) digit += 12;
+			digitNumber[i] = digit;
 		}
 	}
 
     // symbol
-    switch (_numType)
+    switch (numberType)
     {
     /*
     case NUM_TYPE_NORMAL:
-        for (unsigned i = _numDigits; i < maxDigits; ++i)
+        for (unsigned i = digitCount; i < maxDigits; ++i)
         {
             _digit[i] = 0;
         }
-        _numDigits = maxDigits;
+        digitCount = maxDigits;
         break;
     */
 	/*
@@ -698,20 +612,20 @@ void SpriteNumber::updateNumber(int n)
 	*/
     case NUM_TYPE_FULL:
     {
-        switch (_alignType)
+        switch (alignType)
         {
 
         case NUM_ALIGN_RIGHT:
-            if (!_inhibitZero || _numDigits == _maxDigits)
-                _numDigits = _maxDigits - 1;
-            _digit[_numDigits++] = positive ? NUM_FULL_PLUS : NUM_FULL_MINUS;
+            if (!hideLeadingZeros || digitCount == maxDigits)
+                digitCount = maxDigits - 1;
+            digitNumber[digitCount++] = positive ? NUM_FULL_PLUS : NUM_FULL_MINUS;
             break;
 
         case NUM_ALIGN_LEFT:
         case NUM_ALIGN_CENTER: 
-            if (_numDigits == _maxDigits)
-                --_numDigits;
-            _digit[_numDigits++] = positive ? NUM_FULL_PLUS : NUM_FULL_MINUS;
+            if (digitCount == maxDigits)
+                --digitCount;
+            digitNumber[digitCount++] = positive ? NUM_FULL_PLUS : NUM_FULL_MINUS;
             break;
         }
         break;
@@ -722,7 +636,7 @@ void SpriteNumber::updateNumber(int n)
 void SpriteNumber::updateNumberByInd()
 {
     int n;
-    switch (_numInd)
+    switch (numInd)
     {
     case IndexNumber::RANDOM:
         n = std::rand();
@@ -735,9 +649,9 @@ void SpriteNumber::updateNumberByInd()
 		break;
     default:
 #ifdef _DEBUG
-		n = (int)_numInd >= 10000 ? (int)State::get((IndexTimer)((int)_numInd - 10000)) : State::get(_numInd);
+		n = (int)numInd >= 10000 ? (int)State::get((IndexTimer)((int)numInd - 10000)) : State::get(numInd);
 #else
-        n = State::get(_numInd);
+        n = State::get(numInd);
 #endif
         break;
     }
@@ -746,14 +660,14 @@ void SpriteNumber::updateNumberByInd()
 
 void SpriteNumber::updateNumberRect()
 {
-    switch (_alignType)
+    switch (alignType)
     {
     case NUM_ALIGN_RIGHT:
     {
-        RectF offset{ _current.rect.w * (_maxDigits - 1),0,0,0 };
-        for (size_t i = 0; i < _maxDigits; ++i)
+        RectF offset{ _current.rect.w * (maxDigits - 1),0,0,0 };
+        for (size_t i = 0; i < maxDigits; ++i)
         {
-            _rects[i] = _current.rect + offset;
+            digitOutRect[i] = _current.rect + offset;
             offset.x -= _current.rect.w;
         }
         break;
@@ -761,10 +675,10 @@ void SpriteNumber::updateNumberRect()
 
     case NUM_ALIGN_LEFT:
     {
-        RectF offset{ _current.rect.w * (_numDigits - 1),0,0,0 };
-        for (size_t i = 0; i < _numDigits; ++i)
+        RectF offset{ _current.rect.w * (digitCount - 1),0,0,0 };
+        for (size_t i = 0; i < digitCount; ++i)
         {
-            _rects[i] = _current.rect + offset;
+            digitOutRect[i] = _current.rect + offset;
             offset.x -= _current.rect.w;
         }
         break;
@@ -773,13 +687,13 @@ void SpriteNumber::updateNumberRect()
     case NUM_ALIGN_CENTER:
     {
         RectF offset{ 0,0,0,0 };
-        if (_inhibitZero)
-            offset.x = int(std::floor(_current.rect.w * 0.5 * (_numDigits - 1)));
+        if (hideLeadingZeros)
+            offset.x = int(std::floor(_current.rect.w * 0.5 * (digitCount - 1)));
         else
-            offset.x = int(std::floor(_current.rect.w * (0.5 * (_maxDigits + _numDigits) - 1)));
-        for (size_t i = 0; i < _numDigits; ++i)
+            offset.x = int(std::floor(_current.rect.w * (0.5 * (maxDigits + digitCount) - 1)));
+        for (size_t i = 0; i < digitCount; ++i)
         {
-            _rects[i] = _current.rect + offset;
+            digitOutRect[i] = _current.rect + offset;
             offset.x -= _current.rect.w;
         }
         break;
@@ -787,37 +701,37 @@ void SpriteNumber::updateNumberRect()
     }
 }
 
-void SpriteNumber::appendKeyFrame(const RenderKeyFrame& f)
+void SpriteNumber::appendMotionKeyFrame(const MotionKeyFrame& f)
 {
-    _keyFrames.push_back(f);
+    motionKeyFrames.push_back(f);
 }
 
 void SpriteNumber::draw() const
 {
     if (isHidden()) return;
 
-    if (_pTexture->_loaded && _draw)
+    if (pTexture->loaded && _draw)
     {
         //for (size_t i = 0; i < _outRectDigit.size(); ++i)
-        //    _pTexture->draw(_drawRectDigit[i], _outRectDigit[i], _current.angle);
+        //    pTexture->draw(_drawRectDigit[i], _outRectDigit[i], _current.angle);
 
         size_t max = 0;
-        switch (_alignType)
+        switch (alignType)
         {
         case NUM_ALIGN_RIGHT:
-            max = _inhibitZero ? _numDigits : _maxDigits;
+            max = hideLeadingZeros ? digitCount : maxDigits;
             break;
         case NUM_ALIGN_LEFT:
         case NUM_ALIGN_CENTER:
-            max = _numDigits;
+            max = digitCount;
             break;
         default:
             break;
         }
         for (size_t i = 0; i < max; ++i)
         {
-            if (_digit[i] != -1)
-                _pTexture->draw(_texRect[_currAnimFrame * _selections + _digit[i]], _rects[i],
+            if (digitNumber[i] != -1)
+                pTexture->draw(textureRects[animationFrameIndex * selections + digitNumber[i]], digitOutRect[i],
                     _current.color, _current.blend, _current.filter, _current.angle);
         }
     }
@@ -825,8 +739,8 @@ void SpriteNumber::draw() const
 
 void SpriteNumber::adjustAfterUpdate(int x, int y, int w, int h)
 {
-    vSprite::adjustAfterUpdate(x, y, w, h);
-    for (auto& d : _rects)
+    SpriteBase::adjustAfterUpdate(x, y, w, h);
+    for (auto& d : digitOutRect)
     {
         d.x += x - w;
         d.y += y - h;
@@ -835,51 +749,47 @@ void SpriteNumber::adjustAfterUpdate(int x, int y, int w, int h)
     }
 }
 
-SpriteSlider::SpriteSlider(pTexture texture, SliderDirection d, int range, std::function<void(double)> cb,
-	unsigned animFrames, unsigned frameTime, IndexSlider ind, IndexTimer timer,
-	unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-	SpriteSlider(texture, texture ? texture->getRect() : Rect(), d, range, cb,
-		animFrames, frameTime, ind, timer,
-		selRows, selCols, selVerticalIndexing) {}
+////////////////////////////////////////////////////////////////////////////////
+// Slider
 
-SpriteSlider::SpriteSlider(pTexture texture, const Rect& rect, SliderDirection d, int range, std::function<void(double)> cb,
-	unsigned animFrames, unsigned frameTime, IndexSlider ind, IndexTimer timer,
-	unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-	SpriteAnimated(texture, rect, animFrames, frameTime, timer,
-		selRows, selCols, selVerticalIndexing), _callback(cb), _ind(ind), _dir(d), _range(range)
+SpriteSlider::SpriteSlider(const SpriteSliderBuilder& builder) : SpriteAnimated(builder)
 {
-	_type = SpriteTypes::SLIDER;
+    _type = SpriteTypes::SLIDER;
+    dir = builder.sliderDirection;
+    sliderInd = builder.sliderInd;
+    valueRange = builder.sliderRange;
+    _callback = builder.callOnChanged;
 }
 
 void SpriteSlider::updateVal(double v)
 {
-	_value = v;
+	value = v;
 }
 
 void SpriteSlider::updateValByInd()
 {
-	updateVal(State::get(_ind));
+	updateVal(State::get(sliderInd));
 }
 
 void SpriteSlider::updatePos()
 {
-	int pos_diff = static_cast<int>(std::floor((_range-1) * _value));
-	switch (_dir)
+	int pos_diff = static_cast<int>(std::floor((valueRange-1) * value));
+	switch (dir)
 	{
 	case SliderDirection::DOWN:
-        _posMin = _current.rect.y + _current.rect.h / 2;
+        minValuePos = _current.rect.y + _current.rect.h / 2;
 		_current.rect.y += pos_diff;
 		break;
 	case SliderDirection::UP:
-        _posMin = _current.rect.y + _current.rect.h / 2;
+        minValuePos = _current.rect.y + _current.rect.h / 2;
 		_current.rect.y -= pos_diff;
 		break;
 	case SliderDirection::RIGHT:
-        _posMin = _current.rect.x + _current.rect.w / 2;
+        minValuePos = _current.rect.x + _current.rect.w / 2;
 		_current.rect.x += pos_diff;
 		break;
 	case SliderDirection::LEFT:
-        _posMin = _current.rect.x + _current.rect.w / 2;
+        minValuePos = _current.rect.x + _current.rect.w / 2;
 		_current.rect.x -= pos_diff;
 		break;
 	}
@@ -899,36 +809,36 @@ bool SpriteSlider::update(const Time& t)
 bool SpriteSlider::OnClick(int x, int y)
 {
     if (!_draw) return false;
-    if (_range == 0) return false;
+    if (valueRange == 0) return false;
 
     bool inRange = false;
     double val = 0.0;
-    switch (_dir)
+    switch (dir)
     {
     case SliderDirection::UP:
         if (_current.rect.x <= x && x < _current.rect.x + _current.rect.w &&
-            _posMin - _range <= y && y <= _posMin)
+            minValuePos - valueRange <= y && y <= minValuePos)
         {
             inRange = true;
         }
         break;
     case SliderDirection::DOWN:
         if (_current.rect.x <= x && x < _current.rect.x + _current.rect.w &&
-            _posMin <= y && y <= _posMin + _range)
+            minValuePos <= y && y <= minValuePos + valueRange)
         {
             inRange = true;
         }
         break;
     case SliderDirection::LEFT:
         if (_current.rect.y <= y && y < _current.rect.y + _current.rect.h &&
-            _posMin - _range <= x && x <= _posMin)
+            minValuePos - valueRange <= x && x <= minValuePos)
         {
             inRange = true;
         }
         break;
     case SliderDirection::RIGHT:
         if (_current.rect.y <= y && y < _current.rect.y + _current.rect.h &&
-            _posMin <= x && x <= _posMin + _range)
+            minValuePos <= x && x <= minValuePos + valueRange)
         {
             inRange = true;
         }
@@ -945,58 +855,52 @@ bool SpriteSlider::OnClick(int x, int y)
 bool SpriteSlider::OnDrag(int x, int y)
 {
     if (!_draw) return false;
-    if (_range == 0) return false;
+    if (valueRange == 0) return false;
 
     double val = 0.0;
-    switch (_dir)
+    switch (dir)
     {
     case SliderDirection::UP:
-        val = double(_posMin - y) / _range;
+        val = double(minValuePos - y) / valueRange;
         break;
     case SliderDirection::DOWN:
-        val = double(y - _posMin) / _range;
+        val = double(y - minValuePos) / valueRange;
         break;
     case SliderDirection::LEFT:
-        val = double(_posMin - x) / _range;
+        val = double(minValuePos - x) / valueRange;
         break;
     case SliderDirection::RIGHT:
-        val = double(x - _posMin) / _range;
+        val = double(x - minValuePos) / valueRange;
         break;
     }
     val = std::clamp(val, 0.0, 1.0);
-    if (std::abs(_value - val) > 0.000001)  // this should be enough
+    if (std::abs(value - val) > 0.000001)  // this should be enough
     {
-        _value = val;
-        _callback(_value);
+        value = val;
+        _callback(value);
         return true;
     }
     return false;
 }
 
-SpriteBargraph::SpriteBargraph(pTexture texture, BargraphDirection d,
-	unsigned animFrames, unsigned frameTime, IndexBargraph ind, IndexTimer timer,
-	unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-	SpriteBargraph(texture, texture ? texture->getRect() : Rect(), d,
-		animFrames, frameTime, ind, timer,
-		selRows, selCols, selVerticalIndexing) {}
+////////////////////////////////////////////////////////////////////////////////
+// Bargraph
 
-SpriteBargraph::SpriteBargraph(pTexture texture, const Rect& rect, BargraphDirection d,
-	unsigned animFrames, unsigned frameTime, IndexBargraph ind, IndexTimer timer,
-	unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-	SpriteAnimated(texture, rect, animFrames, frameTime, timer,
-		selRows, selCols, selVerticalIndexing), _dir(d), _ind(ind)
+SpriteBargraph::SpriteBargraph(const SpriteBargraphBuilder& builder) : SpriteAnimated(builder)
 {
-	_type = SpriteTypes::BARGRAPH;
+    _type = SpriteTypes::BARGRAPH;
+    dir = builder.barDirection;
+    barInd = builder.barInd;
 }
 
 void SpriteBargraph::updateVal(Ratio v)
 {
-	_value = v;
+	value = v;
 }
 
 void SpriteBargraph::updateValByInd()
 {
-	updateVal(State::get(_ind));
+	updateVal(State::get(barInd));
 }
 
 #pragma warning(push)
@@ -1004,22 +908,22 @@ void SpriteBargraph::updateValByInd()
 void SpriteBargraph::updateSize()
 {
 	int tmp;
-	switch (_dir)
+	switch (dir)
 	{
 	case BargraphDirection::DOWN:
-		_current.rect.h *= _value;
+		_current.rect.h *= value;
 		break;
 	case BargraphDirection::UP:
 		tmp = _current.rect.h;
-		_current.rect.h *= _value;
+		_current.rect.h *= value;
 		_current.rect.y += tmp - _current.rect.h;
 		break;
 	case BargraphDirection::RIGHT:
-		_current.rect.w *= _value;
+		_current.rect.w *= value;
 		break;
 	case BargraphDirection::LEFT:
 		tmp = _current.rect.w;
-		_current.rect.w *= _value;
+		_current.rect.w *= value;
 		_current.rect.x += tmp - _current.rect.w;
 		break;
 	}
@@ -1037,43 +941,53 @@ bool SpriteBargraph::update(const Time& t)
 	return false;
 }
 
-SpriteOption::SpriteOption(pTexture texture,
-	unsigned animFrames, unsigned frameTime, IndexTimer timer,
-	unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-	SpriteOption(texture, texture ? texture->getRect() : Rect(),
-		animFrames, frameTime, timer,
-		selRows, selCols, selVerticalIndexing) {}
+////////////////////////////////////////////////////////////////////////////////
+// Option
 
-SpriteOption::SpriteOption(pTexture texture, const Rect& rect,
-	unsigned animFrames, unsigned frameTime, IndexTimer timer,
-	unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-	SpriteAnimated(texture, rect, animFrames, frameTime, timer,
-		selRows, selCols, selVerticalIndexing)
+SpriteOption::SpriteOption(const SpriteOptionBuilder& builder): SpriteAnimated(builder)
 {
-	_type = SpriteTypes::OPTION;
+    _type = SpriteTypes::OPTION;
+
+    switch (builder.optionType)
+    {
+    case opType::OPTION:
+        indType = opType::OPTION;
+        ind.op = (IndexOption)builder.optionInd;
+        break;
+
+    case opType::SWITCH:
+        indType = opType::SWITCH;
+        ind.sw = (IndexSwitch)builder.optionInd;
+        break;
+
+    case opType::FIXED:
+        indType = opType::FIXED;
+        ind.fix = builder.optionInd;
+        break;
+    }
 }
 
 bool SpriteOption::setInd(opType type, unsigned ind)
 {
-	if (_opType != opType::UNDEF) return false;
+	if (indType != opType::UNDEF) return false;
 	switch (type)
 	{
 	case opType::UNDEF:
 		return false;
 
 	case opType::OPTION:
-		_opType = opType::OPTION;
-		_ind.op = (IndexOption)ind;
+		indType = opType::OPTION;
+		this->ind.op = (IndexOption)ind;
 		return true;
 
 	case opType::SWITCH:
-		_opType = opType::SWITCH;
-		_ind.sw = (IndexSwitch)ind;
+		indType = opType::SWITCH;
+        this->ind.sw = (IndexSwitch)ind;
 		return true;
 
     case opType::FIXED:
-        _opType = opType::FIXED;
-        _ind.fix = ind;
+        indType = opType::FIXED;
+        this->ind.fix = ind;
         return true;
 	}
 	return false;
@@ -1081,27 +995,27 @@ bool SpriteOption::setInd(opType type, unsigned ind)
 
 void SpriteOption::updateVal(unsigned v)
 {
-	_value = v;
+	value = v;
 	updateSelection(v);
 }
 
 void SpriteOption::updateValByInd()
 {
-	switch (_opType)
+	switch (indType)
 	{
 	case opType::UNDEF:
 		break;
 
 	case opType::OPTION:
-		updateVal(State::get(_ind.op));
+		updateVal(State::get(ind.op));
 		break;
 
 	case opType::SWITCH:
-		updateVal(State::get(_ind.sw));
+		updateVal(State::get(ind.sw));
 		break;
 
     case opType::FIXED:
-        updateVal(_ind.fix);
+        updateVal(ind.fix);
         break;
 	}
 }
@@ -1116,31 +1030,25 @@ bool SpriteOption::update(const Time& t)
 	return false;
 }
 
-SpriteButton::SpriteButton(pTexture texture,
-    unsigned animFrames, unsigned frameTime, std::function<void(int)> cb, int panel, int plusonlyValue, IndexTimer timer,
-    unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-    SpriteButton(texture, texture ? texture->getRect() : Rect(),
-        animFrames, frameTime, cb, panel, plusonlyValue, timer,
-        selRows, selCols, selVerticalIndexing) {}
+////////////////////////////////////////////////////////////////////////////////
+// Button
 
-SpriteButton::SpriteButton(pTexture texture, const Rect& rect,
-    unsigned animFrames, unsigned frameTime, std::function<void(int)> cb, int panel, int plusonlyValue, IndexTimer timer,
-    unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-    SpriteOption(texture, rect, animFrames, frameTime, timer,
-        selRows, selCols, selVerticalIndexing), _callback(cb), _panel(panel), _plusonly_value(plusonlyValue)
+SpriteButton::SpriteButton(const SpriteButtonBuilder& builder) : SpriteOption(builder)
 {
     _type = SpriteTypes::BUTTON;
+    clickableOnPanel = builder.clickableOnPanel;
+    plusonlyDelta = builder.plusonlyDelta;
+    callOnClick = builder.callOnClick;
 }
-
 
 bool SpriteButton::OnClick(int x, int y)
 {
     if (!_draw) return false;
 
-    if (_panel < -1 || _panel > 9) return false;
-    if (!checkPanel(_panel)) return false;
+    if (clickableOnPanel < -1 || clickableOnPanel > 9) return false;
+    if (!checkPanel(clickableOnPanel)) return false;
 
-    if (_plusonly_value == 0)
+    if (plusonlyDelta == 0)
     {
         int w_opt = _current.rect.w / 2;
         if (y >= _current.rect.y && y < _current.rect.y + _current.rect.h)
@@ -1148,13 +1056,13 @@ bool SpriteButton::OnClick(int x, int y)
             if (x >= _current.rect.x && x < _current.rect.x + w_opt)
             {
                 // minus
-                _callback(-1);
+                callOnClick(-1);
                 return true;
             }
             else if (x >= _current.rect.x + w_opt && x < _current.rect.x + _current.rect.w)
             {
                 // plus
-                _callback(1);
+                callOnClick(1);
                 return true;
             }
         }
@@ -1167,97 +1075,97 @@ bool SpriteButton::OnClick(int x, int y)
             y < _current.rect.y + _current.rect.h)
         {
             // plusonly
-            _callback(_plusonly_value);
+            callOnClick(plusonlyDelta);
             return true;
         }
     }
     return false;
 }
 
-SpriteGaugeGrid::SpriteGaugeGrid(pTexture texture,
-	unsigned animFrames, unsigned frameTime, int dx, int dy, unsigned min, unsigned max, unsigned grids,
-	IndexTimer timer, IndexNumber num, unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-	SpriteGaugeGrid(texture, texture ? texture->getRect() : Rect(), animFrames, frameTime, 
-        dx, dy, grids, min, max, timer, num, selRows, selCols, selVerticalIndexing) {}
+////////////////////////////////////////////////////////////////////////////////
+// Gauge grids
 
-SpriteGaugeGrid::SpriteGaugeGrid(pTexture texture, const Rect& rect,
-	unsigned animFrames, unsigned frameTime,  int dx, int dy, unsigned min, unsigned max, unsigned grids,
-	IndexTimer timer, IndexNumber num, unsigned selRows, unsigned selCols, bool selVerticalIndexing): 
-	SpriteAnimated(texture, rect, animFrames, frameTime, timer, selRows, selCols, selVerticalIndexing),
-	_diff_x(dx), _diff_y(dy), _grids(grids), _min(min), _max(max), _numInd(num)
+SpriteGaugeGrid::SpriteGaugeGrid(const SpriteGaugeGridBuilder& builder) : SpriteAnimated(builder)
 {
     _type = SpriteTypes::GAUGE;
-    _lighting.resize(_grids, false);
+    gridSizeW = builder.dx;
+    gridSizeH = builder.dy;
+    totalGrids = builder.gridCount;
+    minValue = builder.gaugeMin;
+    maxValue = builder.gaugeMax;
+    numInd = builder.numInd;
+
+    flashing.resize(totalGrids, false);
     setGaugeType(GaugeType::GROOVE);
 }
 
 void SpriteGaugeGrid::setFlashType(SpriteGaugeGrid::FlashType t)
 {
-	_flashType = t;
+	flashType = t;
 }
 
 void SpriteGaugeGrid::setGaugeType(SpriteGaugeGrid::GaugeType ty)
 {
-	_gaugeType = ty;
-	switch (_gaugeType)
+	gaugeType = ty;
+	switch (gaugeType)
 	{
     case GaugeType::ASSIST_EASY:
-        _texIdxLightFail = NORMAL_LIGHT; _texIdxDarkFail = NORMAL_DARK;
-        _texIdxLightClear = CLEAR_LIGHT; _texIdxDarkClear = CLEAR_DARK;
-        _req = (unsigned short)std::floor(0.6 * _grids); break;
+        lightFailGridType = NORMAL_LIGHT; darkFailGridType = NORMAL_DARK;
+        lightClearGridType = CLEAR_LIGHT; darkClearGridType = CLEAR_DARK;
+        failGrids = (unsigned short)std::floor(0.6 * totalGrids); break;
 
     case GaugeType::GROOVE: 
-        _texIdxLightFail = NORMAL_LIGHT; _texIdxDarkFail = NORMAL_DARK; 
-        _texIdxLightClear = CLEAR_LIGHT; _texIdxDarkClear = CLEAR_DARK;
-        _req = (unsigned short)std::floor(0.8 * _grids); break;
+        lightFailGridType = NORMAL_LIGHT; darkFailGridType = NORMAL_DARK; 
+        lightClearGridType = CLEAR_LIGHT; darkClearGridType = CLEAR_DARK;
+        failGrids = (unsigned short)std::floor(0.8 * totalGrids); break;
 
     case GaugeType::SURVIVAL:  
-        _texIdxLightFail = CLEAR_LIGHT; _texIdxDarkFail = CLEAR_DARK;
-        _texIdxLightClear = CLEAR_LIGHT; _texIdxDarkClear = CLEAR_DARK;
-        _req = 1; break;
+        lightFailGridType = CLEAR_LIGHT; darkFailGridType = CLEAR_DARK;
+        lightClearGridType = CLEAR_LIGHT; darkClearGridType = CLEAR_DARK;
+        failGrids = 1; break;
 
     case GaugeType::EX_SURVIVAL: 
-        if (_segments > EXHARD_LIGHT)
+        if (textureRects.size() > EXHARD_LIGHT)
         {
-            _texIdxLightFail = EXHARD_LIGHT; _texIdxDarkFail = EXHARD_DARK;
-            _texIdxLightClear = EXHARD_LIGHT; _texIdxDarkClear = EXHARD_DARK;
+            lightFailGridType = EXHARD_LIGHT; darkFailGridType = EXHARD_DARK;
+            lightClearGridType = EXHARD_LIGHT; darkClearGridType = EXHARD_DARK;
         }
         else
         {
-            _texIdxLightFail = CLEAR_LIGHT; _texIdxDarkFail = CLEAR_DARK;
-            _texIdxLightClear = CLEAR_LIGHT; _texIdxDarkClear = CLEAR_DARK;
+            lightFailGridType = CLEAR_LIGHT; darkFailGridType = CLEAR_DARK;
+            lightClearGridType = CLEAR_LIGHT; darkClearGridType = CLEAR_DARK;
         }
-        _req = 1; break;
+        failGrids = 1; break;
 	default: break;
 	}
 
     Time t(1);
 
     // set FailRect
-    updateSelection(_texIdxLightFail);
+    updateSelection(lightFailGridType);
     SpriteAnimated::update(t);
-    _lightRectFailIdxOffset = unsigned(_selectionIdx * _animFrames);
-    updateSelection(_texIdxDarkFail);
+    lightFailRectIdxOffset = unsigned(selectionIndex * animationFrames);
+    updateSelection(darkFailGridType);
     SpriteAnimated::update(t);
-    _darkRectFailIdxOffset = unsigned(_selectionIdx * _animFrames);
+    darkFailRectIdxOffset = unsigned(selectionIndex * animationFrames);
 
     // set ClearRect
-    updateSelection(_texIdxLightClear);
+    updateSelection(lightClearGridType);
     SpriteAnimated::update(t);
-    _lightRectClearIdxOffset = unsigned(_selectionIdx * _animFrames);
-    updateSelection(_texIdxDarkClear);
+    lightClearRectIdxOffset = unsigned(selectionIndex * animationFrames);
+    updateSelection(darkClearGridType);
     SpriteAnimated::update(t);
-    _darkRectClearIdxOffset = unsigned(_selectionIdx * _animFrames);
+    darkClearRectIdxOffset = unsigned(selectionIndex * animationFrames);
 }
 
 void SpriteGaugeGrid::updateVal(unsigned v)
 {
-	_val = _grids * (v - _min) / (_max - _min);
+	value = totalGrids * (v - minValue) / (maxValue - minValue);
 }
 
 void SpriteGaugeGrid::updateValByInd()
 {
-	updateVal(State::get(_numInd));
+	updateVal(State::get(numInd));
 }
 
 bool SpriteGaugeGrid::update(const Time& t)
@@ -1265,22 +1173,22 @@ bool SpriteGaugeGrid::update(const Time& t)
 	if (SpriteAnimated::update(t))
 	{
         updateValByInd();
-		switch (_flashType)
+		switch (flashType)
 		{
 		case FlashType::NONE:
-			for (unsigned i = 0; i < _val; ++i)
-				_lighting[i] = true;
-			for (unsigned i = _val; i < _grids; ++i)
-				_lighting[i] = false;
+			for (unsigned i = 0; i < value; ++i)
+				flashing[i] = true;
+			for (unsigned i = value; i < totalGrids; ++i)
+				flashing[i] = false;
 			break;
 
 		case FlashType::CLASSIC:
-			for (unsigned i = 0; i < _val; ++i)
-				_lighting[i] = true;
-			if (_val - 3 >= 0 && _val - 3 < _grids && t.norm() / 17 % 2) _lighting[_val - 3] = false; // -3 grid: 17ms, per 2 units (1 0 1 0)
-			if (_val - 2 >= 0 && _val - 2 < _grids && t.norm() / 17 % 4) _lighting[_val - 2] = false; // -2 grid: 17ms, per 4 units (1 0 0 0)
-			for (unsigned i = _val; i < _grids; ++i)
-				_lighting[i] = false;
+			for (unsigned i = 0; i < value; ++i)
+				flashing[i] = true;
+			if (value - 3 >= 0 && value - 3 < totalGrids && t.norm() / 17 % 2) flashing[value - 3] = false; // -3 grid: 17ms, per 2 units (1 0 1 0)
+			if (value - 2 >= 0 && value - 2 < totalGrids && t.norm() / 17 % 4) flashing[value - 2] = false; // -2 grid: 17ms, per 4 units (1 0 0 0)
+			for (unsigned i = value; i < totalGrids; ++i)
+				flashing[i] = false;
 			break;
 			
 		default: break;
@@ -1294,48 +1202,42 @@ void SpriteGaugeGrid::draw() const
 {
     if (isHidden()) return;
 
-    if (_draw && _pTexture != nullptr && _pTexture->isLoaded())
+    if (_draw && pTexture != nullptr && pTexture->isLoaded())
     {
 		RectF r = _current.rect;
-        unsigned grid_val = unsigned(_req - 1);
+        unsigned grid_val = unsigned(failGrids - 1);
         for (unsigned i = 0; i < grid_val; ++i)
         {
-            _lighting[i] ?
-                _pTexture->draw(_texRect[_lightRectFailIdxOffset + _currAnimFrame], r, _current.color, _current.blend, _current.filter, _current.angle) :
-                _pTexture->draw(_texRect[_darkRectFailIdxOffset + _currAnimFrame], r, _current.color, _current.blend, _current.filter, _current.angle);
-            r.x += _diff_x;
-            r.y += _diff_y;
+            flashing[i] ?
+                pTexture->draw(textureRects[lightFailRectIdxOffset + animationFrameIndex], r, _current.color, _current.blend, _current.filter, _current.angle) :
+                pTexture->draw(textureRects[darkFailRectIdxOffset + animationFrameIndex], r, _current.color, _current.blend, _current.filter, _current.angle);
+            r.x += gridSizeW;
+            r.y += gridSizeH;
         }
-        for (unsigned i = grid_val; i < _grids; ++i)
+        for (unsigned i = grid_val; i < totalGrids; ++i)
         {
-            _lighting[i] ?
-                _pTexture->draw(_texRect[_lightRectClearIdxOffset + _currAnimFrame], r, _current.color, _current.blend, _current.filter, _current.angle) :
-                _pTexture->draw(_texRect[_darkRectClearIdxOffset + _currAnimFrame], r, _current.color, _current.blend, _current.filter, _current.angle);
-            r.x += _diff_x;
-            r.y += _diff_y;
+            flashing[i] ?
+                pTexture->draw(textureRects[lightClearRectIdxOffset + animationFrameIndex], r, _current.color, _current.blend, _current.filter, _current.angle) :
+                pTexture->draw(textureRects[darkClearRectIdxOffset + animationFrameIndex], r, _current.color, _current.blend, _current.filter, _current.angle);
+            r.x += gridSizeW;
+            r.y += gridSizeH;
         }
     }
 }
 
-SpriteOnMouse::SpriteOnMouse(pTexture texture,
-    unsigned animFrames, unsigned frameTime, int panel, const Rect& mouseArea, IndexTimer timer,
-    unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-    SpriteOnMouse(texture, texture ? texture->getRect() : Rect(), 
-        animFrames, frameTime, panel, mouseArea, timer,
-        selRows, selCols, selVerticalIndexing) {}
+////////////////////////////////////////////////////////////////////////////////
+// OnMouse
 
-SpriteOnMouse::SpriteOnMouse(pTexture texture, const Rect& rect, 
-    unsigned animFrames, unsigned frameTime, int panel, const Rect& mouseArea, IndexTimer timer,
-    unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-    SpriteAnimated(texture, rect, animFrames, frameTime, timer,
-        selRows, selCols, selVerticalIndexing), panelIdx(panel), area(mouseArea)
+SpriteOnMouse::SpriteOnMouse(const SpriteOnMouseBuilder& builder) : SpriteAnimated(builder)
 {
     _type = SpriteTypes::ONMOUSE;
+    visibleOnPanel = builder.visibleOnPanel;
+    mouseArea = builder.mouseArea;
 }
 
 bool SpriteOnMouse::update(const Time& t)
 {
-    if (!checkPanel(panelIdx)) return false;
+    if (!checkPanel(visibleOnPanel)) return false;
     if (SpriteSelection::update(t))
     {
         return true;
@@ -1347,25 +1249,17 @@ void SpriteOnMouse::OnMouseMove(int x, int y)
 {
     if (_draw)
     {
-        int bx = _current.rect.x + area.x;
-        int by = _current.rect.y + area.y;
-        if (x < bx || x > bx + area.w) _draw = false;
-        if (y < by || y > by + area.h) _draw = false;
+        int bx = _current.rect.x + mouseArea.x;
+        int by = _current.rect.y + mouseArea.y;
+        if (x < bx || x > bx + mouseArea.w) _draw = false;
+        if (y < by || y > by + mouseArea.h) _draw = false;
     }
 }
 
-SpriteCursor::SpriteCursor(pTexture texture, 
-    unsigned animFrames, unsigned frameTime, IndexTimer timer,
-    unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-    SpriteCursor(texture, texture ? texture->getRect() : Rect(),
-        animFrames, frameTime, timer,
-        selRows, selCols, selVerticalIndexing) {}
+////////////////////////////////////////////////////////////////////////////////
+// Cursor
 
-SpriteCursor::SpriteCursor(pTexture texture, const Rect& rect,
-    unsigned animFrames, unsigned frameTime, IndexTimer timer,
-    unsigned selRows, unsigned selCols, bool selVerticalIndexing) :
-    SpriteAnimated(texture, rect, animFrames, frameTime, timer,
-        selRows, selCols, selVerticalIndexing)
+SpriteCursor::SpriteCursor(const SpriteCursorBuilder& builder) : SpriteAnimated(builder)
 {
     _type = SpriteTypes::MOUSE_CURSOR;
 }

@@ -143,7 +143,7 @@ bool convert_bms(std::shared_ptr<ChartFormatBMSMeta> chart, const std::vector<st
     song_all_params params(in);
     chart->fileHash       = params.md5        ;
     chart->folderHash     = params.parent     ;
-    chart->filePath       = Path(params.file, locale_utf8);
+    chart->fileName       = Path(params.file, locale_utf8);
     //                        params.type       ;
     chart->title          = params.title      ;
     chart->title2         = params.title2     ;
@@ -268,9 +268,11 @@ bool SongDB::addChart(const HashMD5& folder, const Path& path)
             {
                 return false;
             }
+            // remove existing entry
+            removeChart(path, folder);
         }
 
-        pChartFormat c = ChartFormatBase::createFromFile(path, 2356);
+        std::shared_ptr<ChartFormatBase> c = ChartFormatBase::createFromFile(path, 2356);
         if (c == nullptr)
         {
             LOG_WARNING << "[SongDB] File error: " << path.u8string();
@@ -307,7 +309,7 @@ bool SongDB::addChart(const HashMD5& folder, const Path& path)
                     c->fileHash.hexdigest(),
                     folder.hexdigest(),
                     int(c->type()),
-                    c->filePath.filename().u8string(),
+                    c->fileName.filename().u8string(),
                     c->title,
                     c->title2,
                     c->artist,
@@ -379,15 +381,8 @@ bool SongDB::removeChart(const HashMD5& md5, const HashMD5& parent)
     return true;
 }
 
-void SongDB::preload()
-{
-    auto result = query("SELECT * FROM song", 0);
-    LOG_INFO << "[SongDB] Chart count: " << result.size();
-    result.clear();
-}
-
 // search from genre, version, artist, artist2, title, title2
-std::vector<pChartFormat> SongDB::findChartByName(const HashMD5& folder, const std::string& tagRaw, unsigned limit) const
+std::vector<std::shared_ptr<ChartFormatBase>> SongDB::findChartByName(const HashMD5& folder, const std::string& tagRaw, unsigned limit) const
 {
     LOG_INFO << "[SongDB] Search for songs matching: " << tagRaw;
 
@@ -418,7 +413,7 @@ std::vector<pChartFormat> SongDB::findChartByName(const HashMD5& folder, const s
     std::string strSql = ss.str();
     auto result = query(strSql.c_str(), SONG_PARAM_COUNT, {tag, tag, tag, tag, tag, tag});
 
-    std::vector<pChartFormat> ret;
+    std::vector<std::shared_ptr<ChartFormatBase>> ret;
     for (const auto& r : result)
     {
         switch (eChartFormat(ANY_INT(r[3])))
@@ -428,9 +423,9 @@ std::vector<pChartFormat> SongDB::findChartByName(const HashMD5& folder, const s
             auto p = std::make_shared<ChartFormatBMSMeta>();
             if (convert_bms(p, r))
             {
-                if (p->filePath.is_absolute())
+                if (p->fileName.is_absolute())
                 {
-                    p->absolutePath = p->filePath;
+                    p->absolutePath = p->fileName;
                     ret.push_back(p);
                 }
                 else
@@ -438,7 +433,7 @@ std::vector<pChartFormat> SongDB::findChartByName(const HashMD5& folder, const s
                     auto& [hasFolderPath, folderPath] = getFolderPath(p->folderHash);
                     if (hasFolderPath)
                     {
-                        p->absolutePath = folderPath / p->filePath;
+                        p->absolutePath = folderPath / p->fileName;
                         ret.push_back(p);
                     }
                 }
@@ -455,15 +450,19 @@ std::vector<pChartFormat> SongDB::findChartByName(const HashMD5& folder, const s
 }
 
 // chart may duplicate, return all found
-std::vector<pChartFormat> SongDB::findChartByHash(const HashMD5& target) const
+std::vector<std::shared_ptr<ChartFormatBase>> SongDB::findChartByHash(const HashMD5& target, bool checksum) const
 {
-    LOG_DEBUG << "[SongDB] Search for song " << target.hexdigest();
+    // LOG_DEBUG << "[SongDB] Search for song " << target.hexdigest();
 
-    auto result = query("SELECT * FROM song WHERE md5=?", SONG_PARAM_COUNT, { target.hexdigest() });
+    std::vector<std::shared_ptr<ChartFormatBase>> ret;
 
-    std::vector<pChartFormat> ret;
-    for (const auto& r : result)
+    if (songQueryHashMap.find(target) == songQueryHashMap.end())
     {
+        return ret;
+    }
+    for (const auto& index : songQueryHashMap.at(target))
+    {
+        const auto& r = songQueryPool[index];
         switch (eChartFormat(ANY_INT(r[3])))
         {
         case eChartFormat::BMS:
@@ -471,9 +470,9 @@ std::vector<pChartFormat> SongDB::findChartByHash(const HashMD5& target) const
             auto p = std::make_shared<ChartFormatBMSMeta>();
             if (convert_bms(p, r))
             {
-                if (p->filePath.is_absolute())
+                if (p->fileName.is_absolute())
                 {
-                    p->absolutePath = p->filePath;
+                    p->absolutePath = p->fileName;
                     ret.push_back(p);
                 }
                 else
@@ -481,7 +480,7 @@ std::vector<pChartFormat> SongDB::findChartByHash(const HashMD5& target) const
                     auto& [hasFolderPath, folderPath] = getFolderPath(p->folderHash);
                     if (hasFolderPath)
                     {
-                        p->absolutePath = folderPath / p->filePath;
+                        p->absolutePath = folderPath / p->fileName;
                         ret.push_back(p);
                     }
                 }
@@ -493,30 +492,31 @@ std::vector<pChartFormat> SongDB::findChartByHash(const HashMD5& target) const
         }
     }
 
-    // remove file mismatch
-    std::list<size_t> removing;
-    for (size_t i = 0; i < ret.size(); ++i)
+    if (checksum)
     {
-        auto hash = md5file(ret[i]->absolutePath);
-        if (hash != target)
+        // remove file mismatch
+        std::list<size_t> removing;
+        for (size_t i = 0; i < ret.size(); ++i)
         {
-            LOG_WARNING << "[SongDB] Chart " << ret[i]->absolutePath.u8string() << " has been modified, ignoring";
-            removing.push_front(i);
+            auto hash = md5file(ret[i]->absolutePath);
+            if (hash != target)
+            {
+                LOG_WARNING << "[SongDB] Chart " << ret[i]->absolutePath.u8string() << " has been modified, ignoring";
+                removing.push_front(i);
+            }
+        }
+        for (size_t i : removing)
+        {
+            ret.erase(ret.begin() + i);
         }
     }
-    for (size_t i : removing)
-    {
-        ret.erase(ret.begin() + i);
-    }
 
-
-    LOG_DEBUG << "[SongDB] found " << ret.size() << " songs";
+    // LOG_DEBUG << "[SongDB] found " << ret.size() << " songs";
     return ret;
-
 }
 
 // chart may duplicate, return all found
-std::vector<pChartFormat> SongDB::findChartFromTime(const HashMD5& folder, unsigned long long addTime) const
+std::vector<std::shared_ptr<ChartFormatBase>> SongDB::findChartFromTime(const HashMD5& folder, unsigned long long addTime) const
 {
     LOG_INFO << "[SongDB] Search from epoch time " << addTime;
 
@@ -529,7 +529,7 @@ std::vector<pChartFormat> SongDB::findChartFromTime(const HashMD5& folder, unsig
     std::string strSql = ss.str();
     auto result = query(strSql.c_str(), SONG_PARAM_COUNT, { (long long)addTime });
 
-    std::vector<pChartFormat> ret;
+    std::vector<std::shared_ptr<ChartFormatBase>> ret;
     for (const auto& r : result)
     {
         switch (eChartFormat(ANY_INT(r[3])))
@@ -539,9 +539,9 @@ std::vector<pChartFormat> SongDB::findChartFromTime(const HashMD5& folder, unsig
             auto p = std::make_shared<ChartFormatBMSMeta>();
             if (convert_bms(p, r))
             {
-                if (p->filePath.is_absolute())
+                if (p->fileName.is_absolute())
                 {
-                    p->absolutePath = p->filePath;
+                    p->absolutePath = p->fileName;
                     ret.push_back(p);
                 }
                 else
@@ -549,7 +549,7 @@ std::vector<pChartFormat> SongDB::findChartFromTime(const HashMD5& folder, unsig
                     auto& [hasFolderPath, folderPath] = getFolderPath(p->folderHash);
                     if (hasFolderPath)
                     {
-                        p->absolutePath = folderPath / p->filePath;
+                        p->absolutePath = folderPath / p->fileName;
                         ret.push_back(p);
                     }
                 }
@@ -566,7 +566,47 @@ std::vector<pChartFormat> SongDB::findChartFromTime(const HashMD5& folder, unsig
 
 }
 
-int SongDB::addFolders(const std::vector<Path>& paths)
+
+void SongDB::prepareCache()
+{
+    LOG_DEBUG << "[SongDB] prepareCache ";
+
+    // compress db i/o
+    freeCache();
+
+    size_t count = 0;
+    for (auto& row : query("SELECT * FROM song", SONG_PARAM_COUNT))
+    {
+        songQueryHashMap[HashMD5(ANY_STR(row[0]))].push_back(count);
+        songQueryParentMap[HashMD5(ANY_STR(row[1]))].push_back(count);
+        songQueryPool.push_back(std::move(row));
+        count++;
+    }
+
+    count = 0;
+    for (auto& row : query("SELECT * FROM folder", FOLDER_PARAM_COUNT))
+    {
+        folderQueryHashMap[HashMD5(ANY_STR(row[0]))].push_back(count);
+        if (row[1].has_value()) 
+            folderQueryParentMap[HashMD5(ANY_STR(row[1]))].push_back(count);
+        folderQueryPool.push_back(std::move(row));
+        count++;
+    }
+}
+
+void SongDB::freeCache()
+{
+    songQueryPool.clear();
+    songQueryPool.shrink_to_fit();
+    songQueryHashMap.clear();
+    songQueryParentMap.clear();
+    folderQueryPool.clear();
+    folderQueryPool.shrink_to_fit();
+    folderQueryHashMap.clear();
+    folderQueryParentMap.clear();
+}
+
+int SongDB::initializeFolders(const std::vector<Path>& paths)
 {
     resetAddSummary();
 
@@ -608,6 +648,8 @@ int SongDB::addFolders(const std::vector<Path>& paths)
 
 int SongDB::addSubFolder(Path path, const HashMD5& parentHash)
 {
+    LOG_VERBOSE << "[SongDB] Add folder: " << path.u8string();
+
     path = (path / ".").lexically_normal();
 
     if (!fs::is_directory(path))
@@ -641,7 +683,7 @@ int SongDB::addSubFolder(Path path, const HashMD5& parentHash)
 
     if (auto q = query("SELECT pathmd5,path,type,modtime FROM folder WHERE path=?", 4, { path.u8string() }); !q.empty())
     {
-        LOG_DEBUG << "[SongDB] Sub folder already exists (" << path.u8string() << ")";
+        LOG_VERBOSE << "[SongDB] Sub folder already exists (" << path.u8string() << ")";
 
         std::string folderMD5 = ANY_STR(q[0][0]);
         std::string folderPath = ANY_STR(q[0][1]);
@@ -653,24 +695,21 @@ int SongDB::addSubFolder(Path path, const HashMD5& parentHash)
             // only update song folder if recently modified
             if (folderModifyTime > folderModifyTimeDB)
             {
-                LOG_DEBUG << "[SongDB] Refresh song folder: " << folderPath;
                 count = refreshExistingFolder(folderMD5, path, folderType);
             }
             else
             {
-                LOG_DEBUG << "[SongDB] Skip refreshing song folder: " << folderPath;
+                LOG_VERBOSE << "[SongDB] Skip refreshing song folder: " << folderPath;
             }
         }
         else
         {
             // step in sub folders
-            LOG_DEBUG << "[SongDB] Step in sub folder: " << folderPath;
             count = refreshExistingFolder(folderMD5, path, folderType);
         }
     }
     else
     {
-        LOG_DEBUG << "[SongDB] Add new sub folder (" << path.u8string() << ")";
         count = addNewFolder(folderHash, path, parentHash);
     }
 
@@ -692,9 +731,13 @@ void SongDB::waitLoadingFinish()
 {
     if (threadPool)
     {
+        LOG_DEBUG << "[SongDB] Waiting for all loading threads...";
+
         // wait for all tasks
         boost::asio::thread_pool& pool = *(boost::asio::thread_pool*)threadPool;
         pool.join();
+
+        LOG_DEBUG << "[SongDB] All loading threads finished, continue";
 
         // The old pool is not valid anymore, removing
         delete (boost::asio::thread_pool*)threadPool;
@@ -704,7 +747,7 @@ void SongDB::waitLoadingFinish()
 
 int SongDB::addNewFolder(const HashMD5& hash, const Path& path, const HashMD5& parentHash)
 {
-    LOG_DEBUG << "[SongDB] Adding new folder " << path.u8string();
+    LOG_DEBUG << "[SongDB] Add new folder " << path.u8string();
 
     FolderType type = FolderType::FOLDER;
     for (auto& f : std::filesystem::directory_iterator(path))
@@ -834,65 +877,68 @@ int SongDB::refreshExistingFolder(const HashMD5& hash, const Path& path, FolderT
 
         // get charts from db
         std::vector<Path> existedFiles;
-        auto existedList = std::make_shared<EntryFolderSong>(browseSong(hash));
-        for (size_t i = 0; i < existedList->getContentsCount(); ++i)
-        {
-            existedFiles.push_back(existedList->getChart(i)->absolutePath);
-        }
-        std::sort(existedFiles.begin(), existedFiles.end());
-
-        // delete file-not-found song entries
         bool hasDeletedEntry = false;
         bool hasModifiedEntry = false;
-        if (!existedFiles.empty())
+        auto existedList = browseSong(hash);
+        if (existedList && !existedList->empty())
         {
-            std::vector<HashMD5> deletedFiles;
-            std::vector<Path> modifiedFiles;
-
             for (size_t i = 0; i < existedList->getContentsCount(); ++i)
             {
-                pChartFormat chart = existedList->getChart(i);
-                if (!fs::exists(chart->absolutePath))
-                {
-                    deletedFiles.push_back(chart->fileHash);
-                }
-                else
-                {
-                    long long fstime = getFileLastWriteTime(path);
-                    if (auto q = query("SELECT addtime FROM song WHERE md5=? AND parent=?", 1, { chart->fileHash.hexdigest(), hash.hexdigest() }); !q.empty())
-                    {
-                        long long dbTime = ANY_INT(q[0][0]);
+                existedFiles.push_back(existedList->getChart(i)->absolutePath);
+            }
+            std::sort(existedFiles.begin(), existedFiles.end());
 
-                        if (fstime > dbTime && md5file(chart->absolutePath) != chart->fileHash)
+            // delete file-not-found song entries
+            if (!existedFiles.empty())
+            {
+                std::vector<HashMD5> deletedFiles;
+                std::vector<Path> modifiedFiles;
+
+                for (size_t i = 0; i < existedList->getContentsCount(); ++i)
+                {
+                    std::shared_ptr<ChartFormatBase> chart = existedList->getChart(i);
+                    if (!fs::exists(chart->absolutePath))
+                    {
+                        deletedFiles.push_back(chart->fileHash);
+                    }
+                    else
+                    {
+                        long long fstime = getFileLastWriteTime(path);
+                        if (auto q = query("SELECT addtime FROM song WHERE md5=? AND parent=?", 1, { chart->fileHash.hexdigest(), hash.hexdigest() }); !q.empty())
                         {
-                            modifiedFiles.push_back(chart->absolutePath);
+                            long long dbTime = ANY_INT(q[0][0]);
+
+                            if (fstime > dbTime && md5file(chart->absolutePath) != chart->fileHash)
+                            {
+                                modifiedFiles.push_back(chart->absolutePath);
+                            }
                         }
                     }
                 }
-            }
 
-            hasDeletedEntry = !deletedFiles.empty();
-            for (auto& chartMD5 : deletedFiles)
-            {
-                if (removeChart(chartMD5, hash))
+                hasDeletedEntry = !deletedFiles.empty();
+                for (auto& chartMD5 : deletedFiles)
                 {
-                    addChartDeleted++;
+                    if (removeChart(chartMD5, hash))
+                    {
+                        addChartDeleted++;
+                    }
                 }
-            }
 
-            hasModifiedEntry = !modifiedFiles.empty();
-            for (auto& chartPath : modifiedFiles)
-            {
-                if (removeChart(chartPath, hash))
+                hasModifiedEntry = !modifiedFiles.empty();
+                for (auto& chartPath : modifiedFiles)
                 {
-                    addChartModified++;
+                    if (removeChart(chartPath, hash))
+                    {
+                        addChartModified++;
+                    }
                 }
-            }
 
-            // remove modified files from existedFiles, and add again below
-            std::vector<Path> existedFilesReal;
-            std::set_difference(existedFiles.begin(), existedFiles.end(), modifiedFiles.begin(), modifiedFiles.end(), std::back_inserter(existedFilesReal));
-            std::swap(existedFiles, existedFilesReal);
+                // remove modified files from existedFiles, and add again below
+                std::vector<Path> existedFilesReal;
+                std::set_difference(existedFiles.begin(), existedFiles.end(), modifiedFiles.begin(), modifiedFiles.end(), std::back_inserter(existedFilesReal));
+                std::swap(existedFiles, existedFilesReal);
+            }
         }
 
         // only add new entries
@@ -931,34 +977,37 @@ int SongDB::refreshExistingFolder(const HashMD5& hash, const Path& path, FolderT
     }
     else
     {
-        LOG_DEBUG << "[SongDB] Checking for new subfolders (" << path.u8string() << ")";
+        LOG_DEBUG << "[SongDB] Checking for new subfolders of " << path.u8string();
 
         // get folders from db
         std::vector<Path> existedFiles;
-        auto existedList = std::make_shared<EntryFolderRegular>(browse(hash, false));
-        for (size_t i = 0; i < existedList->getContentsCount(); ++i)
-        {
-            existedFiles.push_back(existedList->getEntry(i)->getPath());
-        }
-        std::sort(existedFiles.begin(), existedFiles.end());
-
-        // delete file-not-found folders
         bool hasDeletedEntry = false;
-        if (!existedFiles.empty())
+        auto existedList = browse(hash, false);
+        if (existedList && !existedList->empty())
         {
-            std::vector<HashMD5> deletedFiles;
             for (size_t i = 0; i < existedList->getContentsCount(); ++i)
             {
-                if (!fs::exists(existedList->getEntry(i)->getPath()))
-                {
-                    LOG_DEBUG << "[SongDB] Deleting file-not-found folder: " << existedList->getEntry(i)->getPath();
-                    deletedFiles.push_back(existedList->getEntry(i)->md5);
-                }
+                existedFiles.push_back(existedList->getEntry(i)->getPath());
             }
-            hasDeletedEntry = !deletedFiles.empty();
-            for (auto& folderMD5 : deletedFiles)
+            std::sort(existedFiles.begin(), existedFiles.end());
+
+            // delete file-not-found folders
+            if (!existedFiles.empty())
             {
-                removeFolder(folderMD5);
+                std::vector<HashMD5> deletedFiles;
+                for (size_t i = 0; i < existedList->getContentsCount(); ++i)
+                {
+                    if (!fs::exists(existedList->getEntry(i)->getPath()))
+                    {
+                        LOG_DEBUG << "[SongDB] Deleting file-not-found folder: " << existedList->getEntry(i)->getPath();
+                        deletedFiles.push_back(existedList->getEntry(i)->md5);
+                    }
+                }
+                hasDeletedEntry = !deletedFiles.empty();
+                for (auto& folderMD5 : deletedFiles)
+                {
+                    removeFolder(folderMD5);
+                }
             }
         }
 
@@ -991,7 +1040,7 @@ int SongDB::refreshExistingFolder(const HashMD5& hash, const Path& path, FolderT
             }
         }
 
-        LOG_DEBUG << "[SongDB] Checking for new subfolders finished. Added " << count << "entries (" << path.u8string() << ")";
+        LOG_DEBUG << "[SongDB] Checking for new subfolders finished. Added " << count << " entries from " << path.u8string();
         return count;
     }
 }
@@ -1037,17 +1086,28 @@ HashMD5 SongDB::getFolderParent(const HashMD5& folder) const
 
 std::pair<bool, Path> SongDB::getFolderPath(const HashMD5& folder) const
 {
-    auto result = query("SELECT type,path FROM folder WHERE pathmd5=?", 2, { folder.hexdigest()});
-    if (!result.empty())
+    if (!folderQueryHashMap.empty())
     {
-        auto leaf = result[0];
-        //if (ANY_INT(leaf[0]) != FOLDER)
-        //{
-        //    LOG_WARNING << "[SongDB] Get folder path type error: excepted " << FOLDER << ", get " << ANY_INT(leaf[0]) <<
-        //        " (" << folder << ")";
-        //    return Path();
-        //}
-        return { true, PathFromUTF8(ANY_STR(leaf[1])) };
+        if (folderQueryHashMap.find(folder) != folderQueryHashMap.end())
+        {
+            auto cols = folderQueryPool[folderQueryHashMap.at(folder)[0]];
+            return { true, PathFromUTF8(ANY_STR(cols[4])) };
+        }
+    }
+    else
+    {
+        auto result = query("SELECT type,path FROM folder WHERE pathmd5=?", 2, { folder.hexdigest() });
+        if (!result.empty())
+        {
+            auto leaf = result[0];
+            //if (ANY_INT(leaf[0]) != FOLDER)
+            //{
+            //    LOG_WARNING << "[SongDB] Get folder path type error: excepted " << FOLDER << ", get " << ANY_INT(leaf[0]) <<
+            //        " (" << folder << ")";
+            //    return Path();
+            //}
+            return { true, PathFromUTF8(ANY_STR(leaf[1])) };
+        }
     }
     LOG_INFO << "[SongDB] Get folder path fail: target " << folder.hexdigest() << " not found";
     return { false, Path() };
@@ -1078,25 +1138,27 @@ HashMD5 SongDB::getFolderHash(Path path) const
 
 
 
-EntryFolderRegular SongDB::browse(HashMD5 root, bool recursive)
+std::shared_ptr<EntryFolderRegular> SongDB::browse(HashMD5 root, bool recursive)
 {
-    LOG_DEBUG << "[SongDB] browse folder " << root.hexdigest() << (recursive ? " RECURSIVE" : "");
-
     auto& [hasPath, path] = getFolderPath(root);
     if (!hasPath)
-        return EntryFolderRegular(HashMD5(), "");
-
-    EntryFolderRegular list(root, path);
-
-    auto result = query("SELECT pathmd5,parent,name,type,path,modtime FROM folder WHERE parent=?", 6, { root.hexdigest() });
-    if (!result.empty())
     {
-        for (auto& c : result)
+        return nullptr;
+    }
+
+    LOG_DEBUG << "[SongDB] browse folder " << path.u8string() << (recursive ? " RECURSIVE" : "");
+
+    std::shared_ptr<EntryFolderRegular> list = std::make_shared<EntryFolderRegular>(root, path);
+
+    if (folderQueryParentMap.find(root) != folderQueryParentMap.end())
+    {
+        for (const auto& index : folderQueryParentMap.at(root))
         {
+            const auto& c = folderQueryPool[index];
             auto md5 = ANY_STR(c[0]);
             auto parent = ANY_STR(c[1]);
             auto name = ANY_STR(c[2]);
-            auto type = (FolderType) ANY_INT(c[3]);
+            auto type = (FolderType)ANY_INT(c[3]);
             auto path = ANY_STR(c[4]);
             auto modtime = ANY_INT(c[5]);
 
@@ -1106,53 +1168,56 @@ EntryFolderRegular SongDB::browse(HashMD5 root, bool recursive)
             {
                 if (recursive)
                 {
-                    auto sub = std::make_shared<EntryFolderRegular>(browse(md5, false));
-                    sub->_name = name;
-                    sub->_addTime = modtime;
-                    list.pushEntry(sub);
+                    auto sub = browse(md5, false);
+                    if (sub && !sub->empty())
+                    {
+                        sub->_name = name;
+                        sub->_addTime = modtime;
+                        list->pushEntry(sub);
+                    }
                 }
                 else
                 {
                     auto sub = std::make_shared<EntryFolderRegular>(md5, PathFromUTF8(path), name, "");
                     sub->_addTime = modtime;
-                    list.pushEntry(sub);
+                    list->pushEntry(sub);
                 }
                 break;
             }
             case SONG_BMS:
-                auto bmsList = std::make_shared<EntryFolderSong>(browseSong(md5));
+                auto bmsList = browseSong(md5);
                 // name is set inside browseSong
-                if (!bmsList->empty())
+                if (bmsList && !bmsList->empty())
                 {
                     bmsList->_addTime = modtime;
-                    list.pushEntry(bmsList);
+                    list->pushEntry(bmsList);
                 }
                 break;
             }
         }
     }
 
-    LOG_DEBUG << "[SongDB] browsed folder: " << list.getContentsCount() << " entries";
+    LOG_DEBUG << "[SongDB] browse folder: " << list->getContentsCount() << " entries";
 
     return list;
 }
 
-EntryFolderSong SongDB::browseSong(HashMD5 root)
+std::shared_ptr<EntryFolderSong> SongDB::browseSong(HashMD5 root)
 {
-    LOG_DEBUG << "[SongDB] browse song " << root.hexdigest();
+    LOG_VERBOSE << "[SongDB] browse from " << root.hexdigest();
 
     auto& [hasPath, path] = getFolderPath(root);
     if (!hasPath)
-        return EntryFolderSong(HashMD5(), "");
+        return nullptr;
 
-    EntryFolderSong list(root, path);
+    std::shared_ptr<EntryFolderSong> list = std::make_shared<EntryFolderSong>(root, path);
     bool isNameSet = false;
 
-    auto result = query("SELECT * from song WHERE parent=?", SONG_PARAM_COUNT, { root.hexdigest() });
-    if (!result.empty())
+    if (songQueryParentMap.find(root) != songQueryParentMap.end())
     {
-        for (auto& c : result)
+        for (const auto& index : songQueryParentMap.at(root))
         {
+            const auto& c = songQueryPool[index];
             auto type = (eChartFormat)ANY_INT(c[3]);
             switch (type)
             {
@@ -1161,18 +1226,18 @@ EntryFolderSong SongDB::browseSong(HashMD5 root)
                 auto p = std::make_shared<ChartFormatBMSMeta>();
                 if (convert_bms(p, c))
                 {
-                    if (p->filePath.is_absolute())
-                        p->absolutePath = p->filePath;
+                    if (p->fileName.is_absolute())
+                        p->absolutePath = p->fileName;
                     else
-                        p->absolutePath = path / p->filePath;
+                        p->absolutePath = path / p->fileName;
 
-                    list.pushChart(p);
+                    list->pushChart(p);
                 }
                 if (!isNameSet)
                 {
                     isNameSet = true;
-                    list._name = p->title;
-                    list._name2 = p->title2;
+                    list->_name = p->title;
+                    list->_name2 = p->title2;
                 }
                 break;
             }
@@ -1182,29 +1247,29 @@ EntryFolderSong SongDB::browseSong(HashMD5 root)
         }
     }
 
-    LOG_DEBUG << "[SongDB] browsed song: " << list.getContentsCount() << " entries";
+    LOG_VERBOSE << "[SongDB] browsed song: " << list->getContentsCount() << " entries";
 
     return list;
 }
 
 
-EntryFolderRegular SongDB::search(HashMD5 root, std::string key)
+std::shared_ptr<EntryFolderRegular> SongDB::search(HashMD5 root, std::string key)
 {
     LOG_DEBUG << "[SongDB] search " << root.hexdigest() << " " << key;
 
     auto& [hasPath, path] = getFolderPath(root);
     if (!hasPath)
-        return EntryFolderRegular(HashMD5(), "");
+        return nullptr;
 
-    EntryFolderRegular list(md5(key), "");
+    std::shared_ptr<EntryFolderRegular> list = std::make_shared<EntryFolderRegular>(md5(key), "");
     for (auto& c : findChartByName(root, key))
     {
         auto f = std::make_shared<EntryFolderSong>(HashMD5(), "", c->title, c->title2);
         f->pushChart(c);
-        list.pushEntry(f);
+        list->pushEntry(f);
     }
 
-    LOG_DEBUG << "[SongDB] " << list.getContentsCount() << " entries found";
+    LOG_DEBUG << "[SongDB] " << list->getContentsCount() << " entries found";
 
     return list;
 }

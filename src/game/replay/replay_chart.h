@@ -159,14 +159,14 @@ public:
     HashMD5     chartHash;
     uint64_t    randomSeed = 0;
 
-    eModGauge   gaugeType = eModGauge::NORMAL;  
-    eModRandom  randomTypeLeft = eModRandom::NONE; 
-    eModRandom  randomTypeRight = eModRandom::NONE; 
+    PlayModifierGaugeType   gaugeType = PlayModifierGaugeType::NORMAL;  
+    PlayModifierRandomType  randomTypeLeft = PlayModifierRandomType::NONE; 
+    PlayModifierRandomType  randomTypeRight = PlayModifierRandomType::NONE; 
     int8_t      laneEffectType = 0;     // OFF/HID/SUD/SUDHID/LIFT/LIFTSUD
     int8_t      pitchType = 0;          // FREQ/PITCH/SPEED
     int8_t      pitchValue = 0;         // -12 ~ +12 (value below 0 may invalid)
     uint8_t     assistMask = 0;
-    eModHs      hispeedFix = eModHs::NONE;
+    PlayModifierHispeedFixType      hispeedFix = PlayModifierHispeedFixType::NONE;
     bool        DPFlip = false;
     bool        DPBattle = false;
     double      hispeed = 0;
@@ -227,18 +227,18 @@ public:
 CEREAL_CLASS_VERSION(ReplayChart, 2);
 
 
-extern const std::map<Input::Pad, ReplayChart::Commands::Type> replay_input_down_cmd_map;
+extern const std::map<Input::Pad, ReplayChart::Commands::Type> REPLAY_INPUT_DOWN_CMD_MAP;
 
-extern const std::map<Input::Pad, ReplayChart::Commands::Type> replay_input_up_cmd_map;
+extern const std::map<Input::Pad, ReplayChart::Commands::Type> REPLAY_INPUT_UP_CMD_MAP;
 
-extern const std::map<Input::Pad, ReplayChart::Commands::Type> replay_input_down_cmd_map_5k[4];
+extern const std::map<Input::Pad, ReplayChart::Commands::Type> REPLAY_INPUT_DOWN_CMD_MAP_5K[4];
 
-extern const std::map<Input::Pad, ReplayChart::Commands::Type> replay_input_up_cmd_map_5k[4];
+extern const std::map<Input::Pad, ReplayChart::Commands::Type> REPLAY_INPUT_UP_CMD_MAP_5K[4];
 
-extern const std::map<ReplayChart::Commands::Type, Input::Pad> replay_cmd_input_down_map;
+extern const std::map<ReplayChart::Commands::Type, Input::Pad> REPLAY_CMD_INPUT_DOWN_MAP;
 
-extern const std::map<ReplayChart::Commands::Type, Input::Pad> replay_cmd_input_up_map;
+extern const std::map<ReplayChart::Commands::Type, Input::Pad> REPLAY_CMD_INPUT_UP_MAP;
 
-extern const std::map<ReplayChart::Commands::Type, Input::Pad> replay_cmd_input_down_map_5k[4];
+extern const std::map<ReplayChart::Commands::Type, Input::Pad> REPLAY_CMD_INPUT_DOWN_MAP_5K[4];
 
-extern const std::map<ReplayChart::Commands::Type, Input::Pad> replay_cmd_input_up_map_5k[4];
+extern const std::map<ReplayChart::Commands::Type, Input::Pad> REPLAY_CMD_INPUT_UP_MAP_5K[4];

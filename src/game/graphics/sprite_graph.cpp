@@ -3,10 +3,17 @@
 
 const size_t RT_GRAPH_THRESHOLD = 50;
 
-SpriteLine::SpriteLine(int player, LineType ltype, int field_w, int field_h, int start, int end, int width, Color color) :
-    SpriteStatic(nullptr), _player(player), _ltype(ltype), _field_w(field_w), _field_h(field_h), _start(start), _end(end), _line(width), _color(color)
+SpriteLine::SpriteLine(const SpriteLineBuilder& builder) : SpriteStatic(builder)
 {
     _type = SpriteTypes::LINE;
+    _player = builder.player;
+    _ltype = builder.lineType;
+    _field_w = builder.canvasW;
+    _field_h = builder.canvasH;
+    _start = builder.start;
+    _end = builder.end;
+    _line = builder.lineWeight;
+    textColor = builder.color;
 }
 
 void SpriteLine::appendPoint(const ColorPoint& c) { _points.push_back(c); }
@@ -17,7 +24,7 @@ void SpriteLine::draw() const
 
     for (auto& [p1, p2] : _rects)
     {
-        _line.draw(p1, p2, _color * _current.color);
+        _line.draw(p1, p2, textColor * _current.color);
     }
 }
 
@@ -26,7 +33,7 @@ void SpriteLine::updateProgress(const Time& t)
     int duration = _end - _start;
     if (duration > 0)
     {
-        long long rt = t.norm() - State::get(_triggerTimer);
+        long long rt = t.norm() - State::get(motionStartTimer);
         if (rt >= _start)
         {
             _progress = (double)(rt - _start) / duration;
@@ -256,10 +263,10 @@ bool SpriteLine::update(const Time& t)
         case LineType::GAUGE_C:
             switch (gPlayContext.mods[_player].gauge)
             {
-            case eModGauge::EXHARD:
-            case eModGauge::DEATH:
-            case eModGauge::GRADE_HARD:
-            case eModGauge::GRADE_DEATH:
+            case PlayModifierGaugeType::EXHARD:
+            case PlayModifierGaugeType::DEATH:
+            case PlayModifierGaugeType::GRADE_HARD:
+            case PlayModifierGaugeType::GRADE_DEATH:
                 _current.color.g = _current.color.r;
                 break;
             default:

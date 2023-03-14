@@ -6,7 +6,7 @@
 #include "common/types.h"
 #include "db_conn.h"
 
-class vScore;
+class ScoreBase;
 class ScoreBMS;
 
 /* TABLE classic_chart:
@@ -18,7 +18,7 @@ class ScoreBMS;
 class ScoreDB : public SQLite
 {
 protected:
-    mutable std::map<std::string, std::shared_ptr<ScoreBMS>> cache;
+    mutable std::unordered_map<std::string, std::unordered_map<std::string, std::shared_ptr<ScoreBMS>>> cache;
 
 public:
     ScoreDB() = delete;
@@ -37,4 +37,6 @@ public:
 
     std::shared_ptr<ScoreBMS> getCourseScoreBMS(const HashMD5& hash) const;
     void updateCourseScoreBMS(const HashMD5& hash, const ScoreBMS& score);
+
+    void preloadScore();
 };
